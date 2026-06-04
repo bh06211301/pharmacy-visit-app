@@ -263,6 +263,16 @@ hr { border: none; border-top: 0.5px solid var(--border2); margin: 14px 0; }
       <button class="btn-sm" onclick="locateMe()">📡 定位</button>
     </div>
 
+    <div style="margin-bottom:10px;padding:10px 12px;background:var(--bg2);border-radius:var(--radius-sm);border:0.5px dashed var(--border)">
+      <div style="font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.06em;margin-bottom:8px">🧪 測試模式（模擬到訪）</div>
+      <select id="test-select" style="width:100%;padding:8px 10px;font-size:13px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);margin-bottom:8px;font-family:var(--font)">
+        <option value="">— 選一家藥局來模擬 —</option>
+      </select>
+      <button class="btn-action" onclick="simulateVisit()" style="height:36px;font-size:13px;width:100%">
+        📍 模擬我就在這家旁邊（自動跳到紀錄）
+      </button>
+    </div>
+
     <div class="section-label">附近與客戶清單</div>
     <div class="pharma-list" id="pharma-list">
       <div class="spinner">⏳ 載入中...</div>
@@ -341,10 +351,34 @@ hr { border: none; border-top: 0.5px solid var(--border2); margin: 14px 0; }
 
 <script>
 // ========== 設定 ==========
-const CLAUDE_API = 'https://api.anthropic.com/v1/messages';
+// ★ 請填入你的 Gemini API Key（從 aistudio.google.com 申請）
+const GEMINI_API_KEY = 'AIzaSyDn6npcJ51-WRr8ysC_3xMEwwHmkF_C0VQ';
+const GEMINI_API = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+// Gemini API 呼叫封裝函數
+async function callGemini(systemPrompt, messages) {
+  // 把對話歷史轉成 Gemini 格式
+  const contents = messages.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }]
+  }));
+
+  const res = await fetch(GEMINI_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents,
+      generationConfig: { maxOutputTokens: 1500, temperature: 0.7 }
+    })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
 
 // ★ 請填入你的 Google Apps Script Webhook URL（部署後貼入）
-const SHEETS_WEBHOOK = 'https://script.google.com/macros/s/AKfycbz5t-Jz2BgLaoN6e0SL3kt-PKt4_DGP2ymyO8WmNaz96MEpfB8ViPGmZePfjM24iwxf/exec';
+const SHEETS_WEBHOOK = 'YOUR_APPS_SCRIPT_WEBHOOK_URL';
 
 // Google Sheets 公開讀取（CSV 匯出）
 const SHEETS_CSV_URL = 'https://docs.google.com/spreadsheets/d/1qJ62K5Hd2bKP9DdQTjwJOOy0njNICMSPiayW7YJZdNM/export?format=csv&sheet=新客戶資料表_AppSheet';
@@ -364,18 +398,17 @@ document.getElementById('date-sub').textContent = new Date().toLocaleDateString(
   year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
 });
 
-async function init() {
-  // 先從本地暫存讀
-  const cached = localStorage.getItem('pharma_cache');
-  const cacheTime = localStorage.getItem('pharma_cache_time');
-  const oneDay = 24 * 60 * 60 * 1000;
+// ★ 寫死的藥局資料（從 Google Sheets 匯入，共 130 筆）
+const BUILTIN_PHARMACIES = [{"id": "C001", "name": "台北灣藥局", "addr": "新北市淡水區新市一路一段32號", "lat": 25.1867303, "lng": 121.4306687, "title": "藥師", "keyMan": "李庭毅"}, {"id": "C002", "name": "沙崙躍獅藥局", "addr": "新北市淡水區沙崙路189號", "lat": 25.1841192, "lng": 121.4245945, "title": "藥師", "keyMan": "刀哥 喬伊"}, {"id": "C003", "name": "康揚藥局", "addr": "台北市信義區忠孝東路五段412號", "lat": 25.0407211, "lng": 121.575118, "title": "藥師", "keyMan": "陳存洋"}, {"id": "C004", "name": "林口辰安藥局", "addr": "新北市林口區文化3路1段191巷5號", "lat": 25.0651846, "lng": 121.3611066, "title": "藥師", "keyMan": "林承諭"}, {"id": "C005", "name": "富凱昆陽藥局", "addr": "台北市南港區昆陽街140巷8號", "lat": 25.049689, "lng": 121.594014, "title": "藥師", "keyMan": "潘藥師"}, {"id": "C006", "name": "信義辰安藥局", "addr": "桃園市中壢區信義路114號", "lat": 24.9741195, "lng": 121.2574514, "title": "藥師", "keyMan": "黃藥師"}, {"id": "C007", "name": "蘆竹辰安藥局", "addr": "桃園市蘆竹區上興路216號", "lat": 25.018903, "lng": 121.260138, "title": "採購", "keyMan": "副店長"}, {"id": "C008", "name": "美德心藥局", "addr": "新北市林口區公園路63號", "lat": 25.0691641, "lng": 121.3678109, "title": "藥師", "keyMan": "陳家揚"}, {"id": "C009", "name": "艾禾藥局", "addr": "台北市中山區大直街63號", "lat": 25.083539, "lng": 121.546446, "title": "藥師", "keyMan": "林盛元"}, {"id": "C010", "name": "廣興辰安藥局", "addr": "桃園市八德區廣興二路11號", "lat": 24.9330579, "lng": 121.2836689, "title": "藥師", "keyMan": ""}, {"id": "C011", "name": "安捷幸福藥局", "addr": "桃園市中壢區莊敬路100號", "lat": 24.9703317, "lng": 121.2571708, "title": "藥師", "keyMan": "程曉恩"}, {"id": "C012", "name": "力賀藥局", "addr": "新北市中和區連城路7號", "lat": 25.0021165, "lng": 121.4992382, "title": "藥師", "keyMan": "洪偉倫"}, {"id": "C013", "name": "天養藥局", "addr": "台北市士林區中山北路六段262號", "lat": 25.1095898, "lng": 121.5255862, "title": "藥師", "keyMan": "劉晰恬"}, {"id": "C014", "name": "來福藥局", "addr": "新北市新莊區中港路512號", "lat": 25.0518291, "lng": 121.4518398, "title": "藥師", "keyMan": "陳傑宇"}, {"id": "C015", "name": "樂安生活藥局", "addr": "新北市泰山區明志路三段92號", "lat": 25.0413517, "lng": 121.4249118, "title": "藥師", "keyMan": ""}, {"id": "C016", "name": "誠欣藥局", "addr": "桃園市八德區豐德二路2號1樓", "lat": 24.9253906, "lng": 121.286191, "title": "藥師", "keyMan": "蔡志峰"}, {"id": "C017", "name": "柏仁藥局", "addr": "新北市板橋區大觀路三段160巷38號1樓", "lat": 24.994135, "lng": 121.429886, "title": "藥師", "keyMan": "林藥師"}, {"id": "C018", "name": "萬壽辰安藥局", "addr": "桃園市龜山區萬壽路二段1081號", "lat": 24.9939327, "lng": 121.3346002, "title": "藥師", "keyMan": "葉藥師"}, {"id": "C019", "name": "日出藥局", "addr": "台北市南港區玉成街158號一樓", "lat": 25.0449067, "lng": 121.5838648, "title": "藥師", "keyMan": "陳木龍"}, {"id": "C020", "name": "得力藥局", "addr": "新竹縣竹北市福興路528號", "lat": 24.8218269, "lng": 121.0127839, "title": "藥師", "keyMan": "黃彥皓"}, {"id": "C021", "name": "芯羽藥局", "addr": "桃園市龜山區長慶三街66號", "lat": 25.0555398, "lng": 121.3845283, "title": "藥師", "keyMan": "周意玲"}, {"id": "C022", "name": "聯鑫藥師藥局", "addr": "新北市三重區正義北路269號", "lat": 25.0700474, "lng": 121.4954492, "title": "採購", "keyMan": ""}, {"id": "C023", "name": "萬芯中西藥局", "addr": "台北市松山區八德路三段163號", "lat": 25.0481861, "lng": 121.5553382, "title": "藥師", "keyMan": "俞藥師"}, {"id": "C024", "name": "桔子藥局", "addr": "新北市三峽區大德路186號", "lat": 24.9452788, "lng": 121.3758491, "title": "藥師", "keyMan": ""}, {"id": "C025", "name": "中山辰安藥局", "addr": "桃園市中壢區中山東路2段550號1樓", "lat": 24.9465796, "lng": 121.2459483, "title": "藥師", "keyMan": ""}, {"id": "C026", "name": "家赫宇盛藥局", "addr": "台北市士林區中山北路六段218號", "lat": 25.108471, "lng": 121.525418, "title": "藥師", "keyMan": "簡若潔"}, {"id": "C027", "name": "躍獅新民藥局", "addr": "新北市淡水區新民街86號", "lat": 25.1766602, "lng": 121.4384814, "title": "藥師", "keyMan": "勇哥"}, {"id": "C028", "name": "天芮藥局", "addr": "桃園市楊梅區瑞溪路1段252之1號", "lat": 24.907071, "lng": 121.1739359, "title": "藥師", "keyMan": "陳藥師"}, {"id": "C029", "name": "百合藥局", "addr": "新北市中和區秀朗路3段175巷2號1樓", "lat": 24.9908784, "lng": 121.5243476, "title": "藥師", "keyMan": "蔡世雄"}, {"id": "C030", "name": "大愛藥師藥局", "addr": "台北市中山區吉林路255號", "lat": 25.0616622, "lng": 121.5304056, "title": "藥師", "keyMan": "陳藥師"}, {"id": "C031", "name": "美運寶中西藥局", "addr": "新北市鶯歌區永和街56巷4號", "lat": 24.967859, "lng": 121.3335756, "title": "藥師", "keyMan": ""}, {"id": "C032", "name": "沃德藥局", "addr": "桃園市龜山區長壽路137號1樓", "lat": 25.0011324, "lng": 121.342475, "title": "老闆", "keyMan": "郭琮瀚"}, {"id": "C033", "name": "佳德藥局", "addr": "台北市內湖區康寧路三段151號1樓", "lat": 25.070625, "lng": 121.6115302, "title": "藥師", "keyMan": "郭藥師"}, {"id": "C034", "name": "松江健保藥局", "addr": "新北市板橋區松江街72巷12號", "lat": 25.0277745, "lng": 121.4691594, "title": "藥師", "keyMan": "陳維揚"}, {"id": "C035", "name": "大成辰安藥局", "addr": "桃園市楊梅區大成路78號", "lat": 24.9099326, "lng": 121.1458019, "title": "藥師", "keyMan": ""}, {"id": "C036", "name": "金美藥局", "addr": "新北市三峽區大同路238號", "lat": 24.9258088, "lng": 121.3662599, "title": "藥師", "keyMan": "林藥師"}, {"id": "C037", "name": "永印中西健保藥局", "addr": "新北市蘆洲區三民路224號", "lat": 25.0894744, "lng": 121.46872, "title": "藥師", "keyMan": "陳藥師"}, {"id": "C038", "name": "和欣健保藥局", "addr": "新北市土城區學府路1段57號", "lat": 24.9885106, "lng": 121.4597574, "title": "藥師", "keyMan": "鄭世皓"}, {"id": "C040", "name": "小太陽元氣藥局", "addr": "台北市萬華區萬大路433號", "lat": 25.0212001, "lng": 121.4986617, "title": "老闆", "keyMan": ""}, {"id": "C041", "name": "良方藥局", "addr": "新北市樹林區日新街40號1樓", "lat": 24.9925294, "lng": 121.4225797, "title": "藥師", "keyMan": ""}, {"id": "C042", "name": "欣禾藥局", "addr": "桃園市楊梅區新農街407號", "lat": 24.9124809, "lng": 121.157633, "title": "藥師", "keyMan": ""}, {"id": "C043", "name": "大心藥局", "addr": "台北市文山區興隆路2段215號", "lat": 25.0011006, "lng": 121.550086, "title": "藥師", "keyMan": "陳藥師"}, {"id": "C044", "name": "果果藥局", "addr": "新竹縣新豐鄉明新一街2號", "lat": 24.865637, "lng": 120.9893135, "title": "藥師", "keyMan": ""}, {"id": "C045", "name": "仁誠中西藥局", "addr": "桃園市中壢區龍東路284號", "lat": 24.9309431, "lng": 121.2545861, "title": "藥師", "keyMan": "洪藥師"}, {"id": "C046", "name": "富凱延壽藥局", "addr": "台北市松山區延壽街95號", "lat": 25.057205, "lng": 121.5664843, "title": "藥師", "keyMan": ""}, {"id": "C047", "name": "鉅康廖敏昇藥局", "addr": "台北市大同區酒泉街167號", "lat": 25.0721926, "lng": 121.5128735, "title": "老闆", "keyMan": ""}, {"id": "C048", "name": "昱承藥局", "addr": "新北市淡水區新春街96號1樓", "lat": 25.1824327, "lng": 121.4391875, "title": "藥師", "keyMan": "陳慶鴻"}, {"id": "C049", "name": "群康藥局", "addr": "新北市新莊區天祥街96號1樓", "lat": 25.0296705, "lng": 121.4150974, "title": "藥師", "keyMan": "張藥師"}, {"id": "C050", "name": "大豐辰安藥局", "addr": "桃園市大園區大豐二街110號", "lat": 25.0231252, "lng": 121.220058, "title": "藥師", "keyMan": ""}, {"id": "C051", "name": "祐欣藥局", "addr": "新北市汐止區中興路240號1樓", "lat": 25.0680613, "lng": 121.6296706, "title": "藥師", "keyMan": "林祐任"}, {"id": "C052", "name": "安心保健藥局", "addr": "桃園市平鎮區南京路109號", "lat": 24.916206, "lng": 121.2082916, "title": "藥師", "keyMan": "羅藥師"}, {"id": "C053", "name": "德和便利藥局", "addr": "新北市永和區得和路194號", "lat": 24.999633, "lng": 121.520081, "title": "藥師", "keyMan": ""}, {"id": "C054", "name": "浤安藥局", "addr": "桃園市桃園區慈德街1號", "lat": 25.006833, "lng": 121.3019157, "title": "藥師", "keyMan": "楊勝凱"}, {"id": "C055", "name": "安慶藥局", "addr": "桃園市桃園區安慶街91號", "lat": 25.0181352, "lng": 121.2923937, "title": "老闆", "keyMan": "張藥師"}, {"id": "C056", "name": "赫爾振華藥局", "addr": "台北市北投區振華街34號1樓", "lat": 25.115898, "lng": 121.5185562, "title": "藥師", "keyMan": "林宗毅"}, {"id": "C057", "name": "悠樂健保藥局", "addr": "新北市板橋區篤行路2段74號", "lat": 24.9920679, "lng": 121.43146, "title": "藥師", "keyMan": "黃藥師"}, {"id": "C058", "name": "竹東星悅藥局", "addr": "新竹縣竹東鎮光明路260號", "lat": 24.7727575, "lng": 121.056295, "title": "藥師", "keyMan": "李藥師"}, {"id": "C059", "name": "新大賀藥局", "addr": "桃園市平鎮區新榮路259號", "lat": 24.9461617, "lng": 121.2134542, "title": "藥師", "keyMan": "劉耀施"}, {"id": "C060", "name": "關埔中西藥局", "addr": "新竹市東區埔頂三路40號", "lat": 24.7903474, "lng": 121.0125233, "title": "藥師", "keyMan": "彭藥師"}, {"id": "C061", "name": "惠進藥局", "addr": "新北市中和區成功路20號1樓", "lat": 24.9935352, "lng": 121.5260827, "title": "藥師", "keyMan": "周藥師"}, {"id": "C062", "name": "中北生活藥局", "addr": "台北市北投區中央北路一段113號", "lat": 25.134788, "lng": 121.4993512, "title": "藥師", "keyMan": "王藥師"}, {"id": "C063", "name": "安康藥妝藥局", "addr": "新北市深坑區北深路三段175號", "lat": 25.0035579, "lng": 121.6016355, "title": "店長", "keyMan": "謝小姐"}, {"id": "C064", "name": "成家健保藥局", "addr": "新北市中和區中原街116號1樓", "lat": 25.0104874, "lng": 121.4864265, "title": "藥師", "keyMan": "周藥師"}, {"id": "C065", "name": "禾林藥局", "addr": "新北市板橋區民族路300號1樓", "lat": 25.0066638, "lng": 121.4705153, "title": "藥師", "keyMan": "林岑聿"}, {"id": "C066", "name": "知禾藥局", "addr": "桃園市中壢區文發路5號", "lat": 24.9998762, "lng": 121.2108662, "title": "藥師", "keyMan": ""}, {"id": "C067", "name": "永義藥局", "addr": "新北市永和區永貞路81號", "lat": 25.0042906, "lng": 121.5185777, "title": "藥師", "keyMan": "俞藥師"}, {"id": "C068", "name": "拉菈中西藥局", "addr": "桃園市蘆竹區吉林路12號", "lat": 25.0509293, "lng": 121.2963517, "title": "藥師", "keyMan": "劉皓宇"}, {"id": "C069", "name": "易康藥局", "addr": "台北市中山區堤頂大道2段302號", "lat": 25.0783725, "lng": 121.5643243, "title": "藥師", "keyMan": "陳藥師"}, {"id": "C070", "name": "森采藥局", "addr": "桃園市桃園區大業路1段402號1樓", "lat": 25.0032133, "lng": 121.3188343, "title": "藥師", "keyMan": "劉宛盈"}, {"id": "C071", "name": "杏原藥局", "addr": "新北市新莊區福美街132號1樓", "lat": 25.0589429, "lng": 121.4608729, "title": "藥師", "keyMan": "翁藥師"}, {"id": "C072", "name": "柚吉藥局", "addr": "桃園市龜山區萬壽路2段1242之6號1樓", "lat": 24.9939135, "lng": 121.3349325, "title": "藥師", "keyMan": "陳政宏"}, {"id": "C073", "name": "予恩藥局", "addr": "基隆市中正區義二路144號1樓", "lat": 25.1334585, "lng": 121.7470851, "title": "藥師", "keyMan": "游藥師"}, {"id": "C074", "name": "光唯藥局", "addr": "基隆市中正區新豐街432號1樓", "lat": 25.1357521, "lng": 121.7861466, "title": "藥師", "keyMan": "田藥師"}, {"id": "C075", "name": "躍獅思源藥局", "addr": "新北市新莊區頭前路160號", "lat": 25.0527819, "lng": 121.4614878, "title": "藥師", "keyMan": ""}, {"id": "C076", "name": "天杏藥局", "addr": "新北市新店區北新路1段46號1樓", "lat": 24.978282, "lng": 121.5394822, "title": "採購", "keyMan": "郭小姐"}, {"id": "C077", "name": "復泰藥局", "addr": "新北市新店區十四張路389號", "lat": 24.9814995, "lng": 121.5276766, "title": "藥師", "keyMan": "李藥師"}, {"id": "C078", "name": "亮安藥局", "addr": "新北市中和區宜安路2號", "lat": 24.9955402, "lng": 121.5136518, "title": "老闆", "keyMan": "林建良"}, {"id": "C079", "name": "貞心藥局", "addr": "新北市中和區永貞路280之1號1樓", "lat": 25.0040324, "lng": 121.5131663, "title": "藥師", "keyMan": "張傑鈞"}, {"id": "C080", "name": "信毅藥局", "addr": "新北市中和區捷運路56號1樓", "lat": 24.9905727, "lng": 121.5078454, "title": "老闆", "keyMan": "黃騰毅"}, {"id": "C081", "name": "慶華藥師藥局", "addr": "新北市中和區華新街90號1樓", "lat": 24.9830869, "lng": 121.5083532, "title": "藥師", "keyMan": "巫藥師"}, {"id": "C082", "name": "恩溢藥局", "addr": "新北市中和區復興路79號", "lat": 24.9901038, "lng": 121.5035213, "title": "藥師", "keyMan": "李玫緩"}, {"id": "C083", "name": "康荃優生保健藥局", "addr": "新北市中和區福祥路66號1樓", "lat": 25.0048318, "lng": 121.499448, "title": "藥師", "keyMan": "莊禮維"}, {"id": "C084", "name": "田邊藥局", "addr": "新北市中和區泰和街43號一樓", "lat": 25.0003449, "lng": 121.4994875, "title": "老闆", "keyMan": "陳淑芬"}, {"id": "C085", "name": "銓家藥局", "addr": "新北市中和區員山路319號", "lat": 25.0005809, "lng": 121.4811074, "title": "藥師", "keyMan": "李瑞鈞"}, {"id": "C086", "name": "德和便利藥局", "addr": "新北市永和區得和路194號1樓", "lat": 24.9999399, "lng": 121.5201477, "title": "藥師", "keyMan": "陳裕成"}, {"id": "C087", "name": "華興藥師藥局", "addr": "新北市蘆洲區中山一路184號1樓", "lat": 25.0811056, "lng": 121.4739544, "title": "老闆", "keyMan": "巫藥師"}, {"id": "C088", "name": "德康藥局", "addr": "新北市蘆洲區長榮路132號1樓", "lat": 25.0845049, "lng": 121.4615912, "title": "藥師", "keyMan": "蔡鴻瑜"}, {"id": "C089", "name": "大峰藥局", "addr": "新北市板橋區莒光路168號1樓", "lat": 25.0231494, "lng": 121.4740462, "title": "藥師", "keyMan": "陸明達"}, {"id": "C090", "name": "長弘藥局", "addr": "新北市板橋區龍泉街110號", "lat": 25.024569, "lng": 121.456727, "title": "藥師", "keyMan": "辜麗蘭"}, {"id": "C091", "name": "翰林藥局", "addr": "新北市板橋區中正路240號", "lat": 25.0190477, "lng": 121.4557106, "title": "藥師", "keyMan": "黃淑鈴"}, {"id": "C092", "name": "友虹藥師藥局", "addr": "新北市板橋區國光路16號", "lat": 25.0173574, "lng": 121.4570019, "title": "藥師", "keyMan": "洪秋楓"}, {"id": "C093", "name": "薇妮藥妝藥局", "addr": "新北市新莊區民安路99號1樓", "lat": 25.0252636, "lng": 121.424551, "title": "藥師", "keyMan": "吳佩蓉"}, {"id": "C094", "name": "經國藥局", "addr": "桃園市桃園區經國路200號", "lat": 25.0175313, "lng": 121.3053472, "title": "藥師", "keyMan": "康光輝"}, {"id": "C095", "name": "全興藥局", "addr": "桃園市龜山區光峰路153號1樓", "lat": 25.0025863, "lng": 121.3426364, "title": "藥師", "keyMan": "郭世武"}, {"id": "C096", "name": "康泰藥局", "addr": "桃園市桃園區大業路一段323號", "lat": 25.011413, "lng": 121.312704, "title": "藥師", "keyMan": "林育敏"}, {"id": "C097", "name": "杏琳藥局", "addr": "新北市新莊區中平路114號", "lat": 25.0462788, "lng": 121.4449216, "title": "藥師", "keyMan": "陳詠淇"}, {"id": "C098", "name": "新家福藥局", "addr": "桃園市中壢區福州二街419號", "lat": 24.9680043, "lng": 121.2325301, "title": "藥師", "keyMan": "唐小姐"}, {"id": "C099", "name": "泰平藥局", "addr": "新北市樹林區太平路143號", "lat": 24.9799956, "lng": 121.4191215, "title": "藥師", "keyMan": "許志嘉"}, {"id": "C100", "name": "川秀藥局", "addr": "台北市北投區石牌路二段99巷9號一樓", "lat": 25.1188824, "lng": 121.5210654, "title": "藥師", "keyMan": "陳昭星"}, {"id": "C101", "name": "宏安藥局", "addr": "新竹縣湖口鄉中山路二段110號", "lat": 24.901441, "lng": 121.043725, "title": "藥師", "keyMan": "黃藥師"}, {"id": "C102", "name": "樂學辰安藥局", "addr": "桃園市龜山區樂學路498號", "lat": 25.0534943, "lng": 121.3829293, "title": "藥師", "keyMan": "范藥師"}, {"id": "C103", "name": "早安藥局", "addr": "新北市新莊區復興路2段147號", "lat": 25.0445265, "lng": 121.4577583, "title": "藥師", "keyMan": "劉藥師"}, {"id": "C104", "name": "牧風藥局", "addr": "基隆市仁愛區愛二路40號1樓", "lat": 25.1286275, "lng": 121.7419914, "title": "藥師", "keyMan": "宋岳東"}, {"id": "C105", "name": "仁馥中西藥局", "addr": "台北市士林區德行東路11號1樓", "lat": 25.1068146, "lng": 121.5255242, "title": "藥師", "keyMan": "王孟仁"}, {"id": "C106", "name": "歆鈺藥局", "addr": "台北市文山區興隆路四段209號", "lat": 24.9828429, "lng": 121.5625244, "title": "老闆", "keyMan": "何明捷"}, {"id": "C107", "name": "育禾藥局", "addr": "新竹縣竹北市莊敬南路186號", "lat": 24.8155331, "lng": 121.0193507, "title": "藥師", "keyMan": "王佩文"}, {"id": "C108", "name": "綠洲藥局", "addr": "新北市板橋區三民路二段197號", "lat": 25.0138783, "lng": 121.4793687, "title": "藥師", "keyMan": ""}, {"id": "C109", "name": "熊安藥局", "addr": "新北市永和區秀朗路2段229號", "lat": 25.0002339, "lng": 121.5264945, "title": "藥師", "keyMan": "邱光隆"}, {"id": "C110", "name": "湯泉藥師藥局", "addr": "新北市新店區溪園路415號", "lat": 24.9785977, "lng": 121.5245343, "title": "老闆", "keyMan": "彭麗靜"}, {"id": "C111", "name": "唯康藥局", "addr": "桃園市平鎮區中豐路南勢二段144號", "lat": 24.915676, "lng": 121.210506, "title": "藥師", "keyMan": "黑龍"}, {"id": "C112", "name": "躍獅芳心藥局", "addr": "新北市板橋區華江一路596號1樓", "lat": 25.0328194, "lng": 121.4653552, "title": "藥師", "keyMan": ""}, {"id": "C113", "name": "自強藥局", "addr": "新北市三重區自強路一段22號", "lat": 25.0679922, "lng": 121.4986676, "title": "藥師", "keyMan": "柯藥師"}, {"id": "C114", "name": "保康藥局", "addr": "新北市樹林區保安街一段364號", "lat": 24.998588, "lng": 121.417779, "title": "藥師", "keyMan": "廖詹"}, {"id": "C115", "name": "禾宥健保藥局", "addr": "新北市新莊區公園一路30號1樓", "lat": 25.0353085, "lng": 121.4435358, "title": "藥師", "keyMan": "董婉如"}, {"id": "C116", "name": "皇佳大藥局", "addr": "台北市信義區松山路541巷25號1樓", "lat": 25.037978, "lng": 121.5790927, "title": "老闆", "keyMan": "鍾文雅"}, {"id": "C117", "name": "合生藥局", "addr": "台北市松山區南京東路五段123巷45號1樓", "lat": 25.053627, "lng": 121.5607438, "title": "藥師", "keyMan": "邱紹洲"}, {"id": "C118", "name": "佑成藥局", "addr": "新北市新店區民權路101號1樓", "lat": 24.9827604, "lng": 121.5369844, "title": "藥師", "keyMan": "陳祐維"}, {"id": "C119", "name": "祥全藥局", "addr": "台北市中正區信義路二段79巷15號之8一樓", "lat": 25.0355932, "lng": 121.5269914, "title": "藥師", "keyMan": "白昭豐"}, {"id": "C120", "name": "佳民藥局", "addr": "新北市永和區永貞路238號", "lat": 25.0047252, "lng": 121.5119973, "title": "藥師", "keyMan": "魏銘芳"}, {"id": "C121", "name": "東京晟藥局", "addr": "台北市文山區辛亥路四段97號", "lat": 25.0068451, "lng": 121.558766, "title": "藥師", "keyMan": "沈育翰"}, {"id": "C122", "name": "杏仁藥局", "addr": "台北市信義區大道路135號", "lat": 25.0390744, "lng": 121.5833621, "title": "藥師", "keyMan": "簡志穎"}, {"id": "C123", "name": "永康藥局", "addr": "台北市大安區麗水街6-2號", "lat": 25.0328863, "lng": 121.5290188, "title": "藥師", "keyMan": ""}, {"id": "C124", "name": "錦泰藥局", "addr": "基隆市中山區中山二路43號", "lat": 25.1379065, "lng": 121.7405596, "title": "藥師", "keyMan": "徐藥師"}, {"id": "C125", "name": "大麥中西藥局", "addr": "桃園市桃園區龍安街70號", "lat": 24.9886474, "lng": 121.2806659, "title": "藥師", "keyMan": ""}, {"id": "C126", "name": "中日藥局", "addr": "桃園市中壢區中北路二段78號", "lat": 24.9506357, "lng": 121.2251583, "title": "藥師", "keyMan": "邱藥師"}, {"id": "C127", "name": "熊羽藥局", "addr": "新北市土城區中央路1段136號", "lat": 24.991566, "lng": 121.448764, "title": "藥師", "keyMan": "柯博仁"}, {"id": "C128", "name": "美安藥局", "addr": "新北市板橋區金門街268號", "lat": 24.9865044, "lng": 121.4298343, "title": "藥師", "keyMan": ""}, {"id": "C129", "name": "大鳥藥局", "addr": "台北市信義區莊敬路354號", "lat": 25.0276125, "lng": 121.5643388, "title": "藥師", "keyMan": ""}, {"id": "C130", "name": "王佩文", "addr": "新竹縣竹北市中正西路132號", "lat": 24.8405356, "lng": 121.001608, "title": "藥師", "keyMan": ""}, {"id": "C131", "name": "生活大藥局", "addr": "台北市萬華區長沙街二段128號", "lat": 25.0403212, "lng": 121.5035494, "title": "藥師", "keyMan": "簡藥師"}];
 
-  if (cached && cacheTime && Date.now() - parseInt(cacheTime) < oneDay) {
-    pharmacies = JSON.parse(cached);
-    renderList();
-  } else {
-    await fetchFromSheets();
-  }
+async function init() {
+  // 先用寫死資料，確保本地測試和離線都能用
+  pharmacies = BUILTIN_PHARMACIES;
+  renderList();
+  populateTestSelect();
+
+  // 背景嘗試從 Sheets 同步最新資料（部署後才有效）
+  fetchFromSheets().catch(() => {});
 }
 
 async function fetchFromSheets() {
@@ -387,6 +420,7 @@ async function fetchFromSheets() {
     localStorage.setItem('pharma_cache', JSON.stringify(pharmacies));
     localStorage.setItem('pharma_cache_time', Date.now().toString());
     renderList();
+    populateTestSelect();
     setPill('已同步', 'gps-ok');
     setTimeout(() => setPill('準備中', ''), 2000);
   } catch (e) {
@@ -395,6 +429,7 @@ async function fetchFromSheets() {
     if (fallback) {
       pharmacies = JSON.parse(fallback);
       renderList();
+      populateTestSelect();
       showToast('使用暫存資料（無網路）');
     } else {
       document.getElementById('pharma-list').innerHTML = '<div class="spinner">⚠️ 無法載入，請確認網路</div>';
@@ -516,11 +551,50 @@ function autoSelectNearest() {
   const nearest = pharmacies.map(p => ({
     ...p, dist: Math.round(haversine(userLat, userLng, p.lat, p.lng))
   })).sort((a,b) => a.dist - b.dist)[0];
-  if (nearest && nearest.dist <= 100) {
+  if (nearest) {
     selectPharmacy(nearest);
-    showToast(`📍 偵測到：${nearest.name}（${nearest.dist}m）`);
+    showToast(`📍 最近藥局：${nearest.name}（${nearest.dist}m）`);
     switchTab('record');
   }
+}
+
+// ========== 測試模式 ==========
+function populateTestSelect() {
+  const sel = document.getElementById('test-select');
+  if (!sel || pharmacies.length === 0) return;
+  sel.innerHTML = '<option value="">— 選一家藥局來模擬 —</option>';
+  [...pharmacies].sort((a,b) => a.name.localeCompare(b.name, 'zh')).forEach((p, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `${p.name}（${p.addr ? p.addr.slice(0,12) : '—'}）`;
+    sel.appendChild(opt);
+  });
+}
+
+function simulateVisit() {
+  const sel = document.getElementById('test-select');
+  const idx = sel.value;
+  if (idx === '') { showToast('請先選一家藥局'); return; }
+  const sorted = [...pharmacies].sort((a,b) => a.name.localeCompare(b.name, 'zh'));
+  const p = sorted[parseInt(idx)];
+  if (!p) return;
+
+  // 模擬 GPS 就在藥局旁邊 50m 處
+  const fakeLat = p.lat + 0.0003;
+  const fakeLng = p.lng + 0.0003;
+  userLat = fakeLat;
+  userLng = fakeLng;
+
+  const dist = Math.round(haversine(userLat, userLng, p.lat, p.lng));
+  const dot = document.getElementById('gps-dot');
+  dot.className = 'gps-indicator on';
+  document.getElementById('gps-text').textContent = `🧪 測試模式：模擬在 ${p.name} 附近`;
+  setPill('測試中', 'gps-ok');
+
+  selectPharmacy({ ...p, dist });
+  renderList();
+  showToast(`🧪 模擬到訪「${p.name}」（距離 ${dist}m）`);
+  switchTab('record');
 }
 
 function selectPharmacy(p) {
@@ -599,18 +673,7 @@ Key person：${selectedPharmacy.keyMan ? `${selectedPharmacy.title} ${selectedPh
 - 語氣自然，不要照本宣科
 - 繁體中文回覆`;
 
-    const res = await fetch(CLAUDE_API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system,
-        messages: chatHistory
-      })
-    });
-    const data = await res.json();
-    const reply = data.content?.[0]?.text || '好的，繼續說。';
+    const reply = await callGemini(system, chatHistory);
     typing.classList.remove('show');
     chatHistory.push({ role: 'assistant', content: reply });
     addBubble(reply, 'ai');
@@ -647,18 +710,7 @@ async function generateNote() {
 （其他重要事項）`;
 
   try {
-    const res = await fetch(CLAUDE_API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
-        system,
-        messages: chatHistory
-      })
-    });
-    const data = await res.json();
-    const note = data.content?.[0]?.text || '';
+    const note = await callGemini(system, chatHistory);
     document.getElementById('note-content').textContent = note;
     document.getElementById('note-box').classList.add('show');
     document.getElementById('btn-save').disabled = false;
