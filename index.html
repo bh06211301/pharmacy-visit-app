@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="拜訪紀錄">
+<title>藥局拜訪紀錄</title>
+<link rel="manifest" href="manifest.json">
+
+<style>
+:root {
+  --bg: #ffffff;
+  --bg2: #f5f5f7;
+  --bg3: #ebebed;
+  --text: #1d1d1f;
+  --text2: #6e6e73;
+  --text3: #aeaeb2;
+  --border: #d2d2d7;
+  --border2: #e5e5ea;
+  --green: #1d9e75;
+  --green-bg: #e6f7f2;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1c1e; --bg2: #2c2c2e; --bg3: #3a3a3c;
+    --text: #f2f2f7; --text2: #aeaeb2; --text3: #636366;
+    --border: #3a3a3c; --border2: #2c2c2e;
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+
+#app { max-width: 430px; margin: 0 auto; padding: 0 0 80px; }
+
+/* Header */
+.header {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--bg);
+  padding: 12px 16px 10px;
+  border-bottom: 0.5px solid var(--border2);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.header-left h1 { font-size: 17px; font-weight: 600; }
+.header-left .sub { font-size: 12px; color: var(--text2); margin-top: 1px; }
+.status-pill {
+  font-size: 11px; padding: 4px 10px;
+  border-radius: 20px; border: 0.5px solid var(--border);
+  background: var(--bg2); color: var(--text2);
+  transition: all 0.3s;
+}
+.status-pill.gps-ok { background: var(--green-bg); color: var(--green); border-color: var(--green); }
+.status-pill.loading { background: #fff8e6; color: #b8860b; border-color: #f0c040; }
+
+/* Tabs */
+.tabs {
+  display: flex; border-bottom: 0.5px solid var(--border2);
+  background: var(--bg); position: sticky; top: 57px; z-index: 99;
+}
+.tab-btn {
+  flex: 1; padding: 10px 0; font-size: 13px; font-weight: 500;
+  background: none; border: none; color: var(--text2); cursor: pointer;
+  border-bottom: 2px solid transparent; transition: all 0.2s;
+}
+.tab-btn.active { color: var(--text); border-color: var(--text); }
+
+/* Panel */
+.panel { display: none; padding: 12px 16px; }
+.panel.active { display: block; }
+
+/* Section label */
+.section-label {
+  font-size: 11px; font-weight: 600; color: var(--text2);
+  letter-spacing: 0.06em; text-transform: uppercase;
+  margin: 14px 0 6px;
+}
+.section-label:first-child { margin-top: 0; }
+
+/* Input */
+input, textarea {
+  width: 100%; padding: 10px 12px; font-size: 14px;
+  background: var(--bg2); border: 0.5px solid var(--border2);
+  border-radius: var(--radius-sm); color: var(--text);
+  font-family: var(--font); outline: none;
+  transition: border-color 0.2s;
+}
+input:focus, textarea:focus { border-color: var(--text); }
+
+/* GPS row */
+.gps-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 0; margin-bottom: 4px;
+}
+.gps-indicator {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text3); flex-shrink: 0; transition: background 0.3s;
+}
+.gps-indicator.on { background: var(--green); animation: pulse-dot 2s infinite; }
+.gps-indicator.err { background: #e24b4a; }
+@keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.gps-text { font-size: 12px; color: var(--text2); flex: 1; }
+.btn-sm {
+  padding: 6px 12px; font-size: 12px; white-space: nowrap;
+  background: var(--bg2); border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text); cursor: pointer;
+}
+.btn-sm:active { background: var(--bg3); }
+
+/* Pharmacy list */
+.pharma-list { display: flex; flex-direction: column; gap: 6px; }
+.pharma-card {
+  padding: 11px 13px; border-radius: var(--radius);
+  border: 0.5px solid var(--border2); background: var(--bg);
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  transition: all 0.15s;
+}
+.pharma-card:active { background: var(--bg2); }
+.pharma-card.nearby { border-left: 3px solid var(--green); }
+.pharma-card.selected { background: var(--bg2); border-color: var(--border); }
+.pc-info { flex: 1; min-width: 0; }
+.pc-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pc-sub { font-size: 12px; color: var(--text2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pc-dist {
+  font-size: 11px; padding: 2px 8px; border-radius: 10px; flex-shrink: 0;
+  background: var(--green-bg); color: var(--green); font-weight: 500;
+}
+.pc-dist.far { background: var(--bg2); color: var(--text3); }
+
+/* Loading spinner */
+.spinner { text-align: center; padding: 20px; color: var(--text2); font-size: 13px; }
+
+/* Selected banner */
+.selected-banner {
+  display: none; padding: 10px 14px; border-radius: var(--radius);
+  background: var(--green-bg); border: 0.5px solid var(--green);
+  color: var(--green); font-size: 13px; font-weight: 500;
+  align-items: center; gap: 8px; margin-bottom: 10px;
+}
+.selected-banner.show { display: flex; }
+
+/* Progress */
+.progress-row { display: flex; gap: 5px; justify-content: center; margin-bottom: 10px; }
+.pdot { width: 7px; height: 7px; border-radius: 50%; background: var(--bg3); transition: all 0.3s; }
+.pdot.active { background: var(--text); }
+.pdot.done { background: var(--text2); }
+
+/* Chat */
+.chat-wrap {
+  min-height: 260px; max-height: 320px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 4px 0 8px; margin-bottom: 10px;
+}
+.bubble { max-width: 88%; display: flex; flex-direction: column; gap: 2px; }
+.bubble.ai { align-self: flex-start; }
+.bubble.user { align-self: flex-end; }
+.bubble-body {
+  padding: 9px 13px; font-size: 14px; line-height: 1.6;
+  border: 0.5px solid var(--border2);
+}
+.bubble.ai .bubble-body { background: var(--bg2); border-radius: 4px 14px 14px 14px; }
+.bubble.user .bubble-body { background: var(--bg); border-radius: 14px 4px 14px 14px; }
+.bubble-time { font-size: 11px; color: var(--text3); padding: 0 3px; }
+.bubble.user .bubble-time { text-align: right; }
+.typing-dots { display: none; align-self: flex-start; padding: 10px 14px; background: var(--bg2); border-radius: 4px 14px 14px 14px; border: 0.5px solid var(--border2); }
+.typing-dots.show { display: flex; gap: 4px; align-items: center; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); animation: boing 1.2s infinite; }
+.dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
+@keyframes boing{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+
+/* Input row */
+.input-row { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 8px; }
+.input-row textarea {
+  flex: 1; resize: none; min-height: 36px; max-height: 100px; line-height: 1.5;
+}
+.btn-circle {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  border: 0.5px solid var(--border); background: var(--bg2); font-size: 16px;
+  transition: all 0.15s;
+}
+.btn-circle:active { background: var(--bg3); }
+.btn-circle.recording { background: #ffe6e6; border-color: #e24b4a; animation: pulse-btn 1.5s infinite; }
+@keyframes pulse-btn{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+.btn-send {
+  background: var(--text); color: var(--bg); border: none;
+}
+.btn-send:disabled { opacity: 0.3; cursor: default; }
+.btn-send:not(:disabled):active { opacity: 0.7; }
+
+/* Note preview */
+.note-box {
+  display: none; background: var(--bg2); border-radius: var(--radius);
+  border: 0.5px solid var(--border2); padding: 14px;
+  font-size: 13px; line-height: 1.75; white-space: pre-wrap;
+  margin-bottom: 8px; color: var(--text);
+}
+.note-box.show { display: block; }
+.note-box-label { font-size: 11px; font-weight: 600; color: var(--text2); letter-spacing: 0.06em; margin-bottom: 8px; }
+
+/* Action buttons */
+.action-row { display: flex; gap: 8px; }
+.btn-action {
+  flex: 1; height: 40px; font-size: 13px; font-weight: 500; cursor: pointer;
+  border-radius: var(--radius-sm); border: 0.5px solid var(--border);
+  background: var(--bg2); color: var(--text); display: flex; align-items: center; justify-content: center; gap: 5px;
+  transition: all 0.15s;
+}
+.btn-action:active { background: var(--bg3); }
+.btn-action.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+.btn-action.primary:active { opacity: 0.75; }
+.btn-action:disabled { opacity: 0.3; cursor: default; }
+
+/* Add form */
+.add-form { display: flex; flex-direction: column; gap: 8px; }
+.loc-input-row { display: flex; gap: 6px; }
+.loc-input-row input { flex: 1; }
+
+/* NFC tip */
+.nfc-tip {
+  padding: 10px 13px; border-radius: var(--radius-sm);
+  border: 0.5px dashed var(--border); font-size: 12px;
+  color: var(--text2); line-height: 1.6; margin-bottom: 10px;
+}
+
+/* Divider */
+hr { border: none; border-top: 0.5px solid var(--border2); margin: 14px 0; }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: rgba(0,0,0,0.8); color: #fff; font-size: 13px;
+  padding: 9px 18px; border-radius: 20px; opacity: 0; pointer-events: none;
+  transition: all 0.3s; white-space: nowrap; z-index: 999;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header">
+    <div class="header-left">
+      <h1>藥局拜訪紀錄</h1>
+      <div class="sub" id="date-sub"></div>
+    </div>
+    <div class="status-pill" id="status-pill">準備中</div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('pharmacies')" id="tab-pharmacies">📍 藥局</button>
+    <button class="tab-btn" onclick="switchTab('record')" id="tab-record">📝 紀錄</button>
+    <button class="tab-btn" onclick="switchTab('history')" id="tab-history">🗂 歷史</button>
+  </div>
+
+  <!-- ===== 藥局分頁 ===== -->
+  <div class="panel active" id="panel-pharmacies">
+    <div class="gps-row">
+      <div class="gps-indicator" id="gps-dot"></div>
+      <span class="gps-text" id="gps-text">點擊定位，自動找出附近藥局</span>
+      <button class="btn-sm" onclick="locateMe()">📡 定位</button>
+    </div>
+
+    <div class="section-label">附近與客戶清單</div>
+    <div class="pharma-list" id="pharma-list">
+      <div class="spinner">⏳ 載入中...</div>
+    </div>
+
+    <hr>
+    <div class="section-label">手動新增藥局</div>
+    <div class="add-form">
+      <input id="add-name" placeholder="藥局名稱" />
+      <input id="add-addr" placeholder="地址（選填）" />
+      <div class="loc-input-row">
+        <input id="add-lat" placeholder="緯度" readonly />
+        <input id="add-lng" placeholder="經度" readonly />
+        <button class="btn-sm" onclick="captureGPS()">📍 抓位置</button>
+      </div>
+      <button class="btn-action" onclick="addPharmacy()" style="margin-top:2px">＋ 新增</button>
+    </div>
+  </div>
+
+  <!-- ===== 紀錄分頁 ===== -->
+  <div class="panel" id="panel-record">
+    <div class="selected-banner" id="selected-banner">
+      <span>🏪</span>
+      <span id="sel-name">—</span>
+      <span id="sel-dist" style="margin-left:auto;font-size:11px;font-weight:400;"></span>
+    </div>
+
+    <div class="nfc-tip">
+      📲 <strong>NFC 使用方式：</strong>將本 App 網址寫入 NFC 貼片，貼在車上。上車掃一下 → 自動開啟並定位最近藥局。
+    </div>
+
+    <div class="progress-row" id="progress-row">
+      <div class="pdot active" id="pd0"></div>
+      <div class="pdot" id="pd1"></div>
+      <div class="pdot" id="pd2"></div>
+      <div class="pdot" id="pd3"></div>
+      <div class="pdot" id="pd4"></div>
+    </div>
+
+    <div class="chat-wrap" id="chat-wrap">
+      <div class="bubble ai">
+        <div class="bubble-body">請先到「藥局」分頁，點選今天拜訪的藥局，再回來這裡開始紀錄。</div>
+      </div>
+    </div>
+    <div class="typing-dots" id="typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+
+    <div class="input-row">
+      <textarea id="msg-input" placeholder="輸入或語音描述..." rows="1"
+        onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+      <button class="btn-circle" id="mic-btn" onclick="toggleMic()">🎤</button>
+      <button class="btn-circle btn-send" id="send-btn" onclick="sendMsg()" disabled>↑</button>
+    </div>
+
+    <div class="note-box" id="note-box">
+      <div class="note-box-label">中店紀錄預覽</div>
+      <div id="note-content"></div>
+    </div>
+
+    <div class="action-row">
+      <button class="btn-action" id="btn-gen" onclick="generateNote()" disabled>📄 產出紀錄</button>
+      <button class="btn-action primary" id="btn-save" onclick="saveToSheets()" disabled>📊 存到 Sheets</button>
+    </div>
+  </div>
+
+  <!-- ===== 歷史分頁 ===== -->
+  <div class="panel" id="panel-history">
+    <div class="section-label">本機紀錄</div>
+    <div id="history-list"></div>
+    <div style="margin-top:12px">
+      <button class="btn-action" onclick="clearHistory()" style="color:#e24b4a;border-color:#e24b4a">🗑 清除所有紀錄</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ========== 設定 ==========
+const CLAUDE_API = 'https://api.anthropic.com/v1/messages';
+
+// ★ 請填入你的 Google Apps Script Webhook URL（部署後貼入）
+const SHEETS_WEBHOOK = 'YOUR_APPS_SCRIPT_WEBHOOK_URL';
+
+// Google Sheets 公開讀取（CSV 匯出）
+const SHEETS_CSV_URL = 'https://docs.google.com/spreadsheets/d/1qJ62K5Hd2bKP9DdQTjwJOOy0njNICMSPiayW7YJZdNM/export?format=csv&sheet=新客戶資料表_AppSheet';
+
+// ========== 狀態 ==========
+let pharmacies = [];
+let userLat = null, userLng = null;
+let selectedPharmacy = null;
+let chatHistory = [];
+let coveredTopics = new Set();
+let noteGenerated = false;
+let isRecording = false;
+let recognition = null;
+
+// ========== 初始化 ==========
+document.getElementById('date-sub').textContent = new Date().toLocaleDateString('zh-TW', {
+  year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+});
+
+async function init() {
+  // 先從本地暫存讀
+  const cached = localStorage.getItem('pharma_cache');
+  const cacheTime = localStorage.getItem('pharma_cache_time');
+  const oneDay = 24 * 60 * 60 * 1000;
+
+  if (cached && cacheTime && Date.now() - parseInt(cacheTime) < oneDay) {
+    pharmacies = JSON.parse(cached);
+    renderList();
+  } else {
+    await fetchFromSheets();
+  }
+}
+
+async function fetchFromSheets() {
+  try {
+    setPill('載入中...', 'loading');
+    const res = await fetch(SHEETS_CSV_URL);
+    const text = await res.text();
+    pharmacies = parseCSV(text);
+    localStorage.setItem('pharma_cache', JSON.stringify(pharmacies));
+    localStorage.setItem('pharma_cache_time', Date.now().toString());
+    renderList();
+    setPill('已同步', 'gps-ok');
+    setTimeout(() => setPill('準備中', ''), 2000);
+  } catch (e) {
+    // 若網路失敗，讀本地
+    const fallback = localStorage.getItem('pharma_cache');
+    if (fallback) {
+      pharmacies = JSON.parse(fallback);
+      renderList();
+      showToast('使用暫存資料（無網路）');
+    } else {
+      document.getElementById('pharma-list').innerHTML = '<div class="spinner">⚠️ 無法載入，請確認網路</div>';
+    }
+  }
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = parseCSVLine(lines[0]);
+  const result = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const vals = parseCSVLine(lines[i]);
+    const obj = {};
+    headers.forEach((h, idx) => obj[h.trim()] = (vals[idx] || '').trim());
+    const lat = parseFloat(obj['緯度']);
+    const lng = parseFloat(obj['經度']);
+    if (!obj['店名'] || isNaN(lat) || isNaN(lng)) continue;
+    result.push({
+      id: obj['Customer_ID'] || i,
+      name: obj['店名'],
+      addr: obj['地址'] || '',
+      tel: obj['電話'] || '',
+      keyMan: obj['Key Man'] || '',
+      title: obj['稱呼'] || '藥師',
+      lat, lng
+    });
+  }
+  return result;
+}
+
+function parseCSVLine(line) {
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { result.push(cur); cur = ''; }
+    else { cur += c; }
+  }
+  result.push(cur);
+  return result;
+}
+
+// ========== GPS ==========
+function locateMe() {
+  if (!navigator.geolocation) { showToast('瀏覽器不支援定位'); return; }
+  const dot = document.getElementById('gps-dot');
+  dot.className = 'gps-indicator on';
+  document.getElementById('gps-text').textContent = '定位中...';
+  setPill('定位中...', 'loading');
+
+  navigator.geolocation.getCurrentPosition(pos => {
+    userLat = pos.coords.latitude;
+    userLng = pos.coords.longitude;
+    document.getElementById('gps-text').textContent =
+      `${userLat.toFixed(4)}, ${userLng.toFixed(4)}`;
+    dot.className = 'gps-indicator on';
+    setPill('GPS ✓', 'gps-ok');
+    renderList();
+    autoSelectNearest();
+  }, err => {
+    dot.className = 'gps-indicator err';
+    document.getElementById('gps-text').textContent = '定位失敗，請確認權限';
+    setPill('定位失敗', '');
+    showToast('請在瀏覽器允許定位權限');
+  }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+function captureGPS() {
+  if (!navigator.geolocation) { showToast('不支援定位'); return; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    document.getElementById('add-lat').value = pos.coords.latitude.toFixed(6);
+    document.getElementById('add-lng').value = pos.coords.longitude.toFixed(6);
+    showToast('已抓取目前位置');
+  }, () => showToast('定位失敗'));
+}
+
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const d1 = (lat2-lat1)*Math.PI/180, d2 = (lng2-lng1)*Math.PI/180;
+  const a = Math.sin(d1/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(d2/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// ========== 藥局清單 ==========
+function renderList() {
+  const list = document.getElementById('pharma-list');
+  if (!pharmacies.length) { list.innerHTML = '<div class="spinner">無資料</div>'; return; }
+
+  const data = pharmacies.map(p => ({
+    ...p,
+    dist: userLat !== null ? Math.round(haversine(userLat, userLng, p.lat, p.lng)) : null
+  })).sort((a, b) => (a.dist ?? 999999) - (b.dist ?? 999999));
+
+  list.innerHTML = '';
+  data.forEach(p => {
+    const nearby = p.dist !== null && p.dist <= 100;
+    const div = document.createElement('div');
+    div.className = 'pharma-card' + (nearby ? ' nearby' : '') + (selectedPharmacy?.id === p.id ? ' selected' : '');
+    const distHtml = p.dist !== null
+      ? `<div class="pc-dist ${p.dist > 100 ? 'far' : ''}">${p.dist < 1000 ? p.dist + 'm' : (p.dist/1000).toFixed(1) + 'km'}</div>`
+      : '';
+    const keyInfo = p.keyMan ? `${p.title} ${p.keyMan}` : p.title;
+    div.innerHTML = `
+      <div class="pc-info">
+        <div class="pc-name">${p.name}</div>
+        <div class="pc-sub">${p.addr || keyInfo}</div>
+      </div>
+      ${distHtml}`;
+    div.onclick = () => selectPharmacy({...p, dist: p.dist});
+    list.appendChild(div);
+  });
+}
+
+function autoSelectNearest() {
+  if (!userLat || !pharmacies.length) return;
+  const nearest = pharmacies.map(p => ({
+    ...p, dist: Math.round(haversine(userLat, userLng, p.lat, p.lng))
+  })).sort((a,b) => a.dist - b.dist)[0];
+  if (nearest && nearest.dist <= 100) {
+    selectPharmacy(nearest);
+    showToast(`📍 偵測到：${nearest.name}（${nearest.dist}m）`);
+    switchTab('record');
+  }
+}
+
+function selectPharmacy(p) {
+  selectedPharmacy = p;
+  document.getElementById('sel-name').textContent = p.name;
+  document.getElementById('sel-dist').textContent = p.dist !== null ? `距離 ${p.dist}m` : '';
+  document.getElementById('selected-banner').classList.add('show');
+
+  // 重置對話
+  chatHistory = [];
+  coveredTopics = new Set();
+  noteGenerated = false;
+  document.getElementById('note-box').classList.remove('show');
+  document.getElementById('btn-gen').disabled = true;
+  document.getElementById('btn-save').disabled = true;
+  document.getElementById('send-btn').disabled = false;
+  resetProgress();
+
+  const chatWrap = document.getElementById('chat-wrap');
+  chatWrap.innerHTML = '';
+  const keyInfo = p.keyMan ? `（${p.title} ${p.keyMan}）` : '';
+  addBubble(`已選擇「${p.name}」${keyInfo}。拜訪完了嗎？跟我說說今天發生的事情，不用整理格式，想到什麼說什麼就好。`, 'ai');
+  renderList();
+}
+
+// ========== 聊天 ==========
+function addBubble(text, role) {
+  const wrap = document.getElementById('chat-wrap');
+  const div = document.createElement('div');
+  div.className = `bubble ${role}`;
+  const t = new Date().toLocaleTimeString('zh-TW', {hour:'2-digit', minute:'2-digit'});
+  div.innerHTML = `<div class="bubble-body">${text.replace(/\n/g,'<br>')}</div><div class="bubble-time">${t}</div>`;
+  wrap.appendChild(div);
+  wrap.scrollTop = wrap.scrollHeight;
+}
+
+const KEYWORDS = {
+  '客戶反應': ['反應','抱怨','意見','說','覺得','不滿','滿意','回饋','問題','抗議'],
+  '產品討論': ['產品','品項','藥','推薦','介紹','討論','說明','興趣','試用','建議帶'],
+  '庫存與訂單': ['庫存','訂單','補貨','剩','進貨','數量','訂','快沒','缺貨'],
+  '下次行動': ['下次','再去','約','帶','跟進','計畫','回訪','待辦','記得','追蹤']
+};
+
+async function sendMsg() {
+  const input = document.getElementById('msg-input');
+  const text = input.value.trim();
+  const typing = document.getElementById('typing');
+  if (!text || typing.classList.contains('show')) return;
+  if (!selectedPharmacy) { showToast('請先選擇藥局'); switchTab('pharmacies'); return; }
+
+  input.value = ''; autoResize(input);
+  addBubble(text, 'user');
+  chatHistory.push({ role: 'user', content: text });
+
+  // 關鍵字偵測
+  for (const [topic, kws] of Object.entries(KEYWORDS)) {
+    if (!coveredTopics.has(topic) && kws.some(k => text.includes(k))) coveredTopics.add(topic);
+  }
+  updateProgress();
+
+  typing.classList.add('show');
+  document.getElementById('chat-wrap').scrollTop = 99999;
+
+  try {
+    const remaining = ['客戶反應','產品討論','庫存與訂單','下次行動'].filter(t => !coveredTopics.has(t));
+    const system = `你是醫藥業務的拜訪紀錄小助手，輕鬆像同事聊天的語氣。
+使用者剛完成「${selectedPharmacy.name}」的拜訪。
+Key person：${selectedPharmacy.keyMan ? `${selectedPharmacy.title} ${selectedPharmacy.keyMan}` : '（未記錄）'}
+
+已提到的面向：${Array.from(coveredTopics).join('、') || '（尚無）'}
+尚未提到：${remaining.join('、') || '✅ 全部完成'}
+
+規則：
+- 每次只問一個問題，針對最重要的尚未涵蓋面向
+- 若全部面向都涵蓋了，說「資訊很完整了！可以點下方的「產出紀錄」了。」
+- 語氣自然，不要照本宣科
+- 繁體中文回覆`;
+
+    const res = await fetch(CLAUDE_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system,
+        messages: chatHistory
+      })
+    });
+    const data = await res.json();
+    const reply = data.content?.[0]?.text || '好的，繼續說。';
+    typing.classList.remove('show');
+    chatHistory.push({ role: 'assistant', content: reply });
+    addBubble(reply, 'ai');
+    if (coveredTopics.size >= 2) document.getElementById('btn-gen').disabled = false;
+  } catch(e) {
+    typing.classList.remove('show');
+    addBubble('⚠️ 網路問題，請稍後再試。', 'ai');
+  }
+}
+
+// ========== 產出紀錄 ==========
+async function generateNote() {
+  if (!selectedPharmacy) return;
+  document.getElementById('btn-gen').disabled = true;
+  setPill('整理中...', 'loading');
+
+  const today = new Date().toLocaleDateString('zh-TW');
+  const system = `根據以下對話，整理一份藥局業務拜訪中店紀錄。
+只輸出紀錄本身，不要說明文字，不要 markdown 格式。
+
+【藥局名稱】${selectedPharmacy.name}
+【地址】${selectedPharmacy.addr}
+【拜訪日期】${today}
+【Key Person】${selectedPharmacy.keyMan ? `${selectedPharmacy.title} ${selectedPharmacy.keyMan}` : '—'}
+【客戶反應與抱怨】
+（填入內容，若無則寫「無特別反應」）
+【產品討論與推薦】
+（填入內容）
+【庫存與訂單狀況】
+（填入內容）
+【下次拜訪行動】
+（填入行動項目）
+【其他備註】
+（其他重要事項）`;
+
+  try {
+    const res = await fetch(CLAUDE_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        system,
+        messages: chatHistory
+      })
+    });
+    const data = await res.json();
+    const note = data.content?.[0]?.text || '';
+    document.getElementById('note-content').textContent = note;
+    document.getElementById('note-box').classList.add('show');
+    document.getElementById('btn-save').disabled = false;
+    document.getElementById('btn-gen').disabled = false;
+    noteGenerated = true;
+    setPill('✓ 完成', 'gps-ok');
+
+    // 存本地歷史
+    const history = JSON.parse(localStorage.getItem('visit_history') || '[]');
+    history.unshift({
+      id: Date.now(),
+      pharmacy: selectedPharmacy.name,
+      date: today,
+      note
+    });
+    localStorage.setItem('visit_history', JSON.stringify(history.slice(0, 50)));
+  } catch(e) {
+    document.getElementById('btn-gen').disabled = false;
+    setPill('整理失敗', '');
+    showToast('⚠️ 整理失敗，請重試');
+  }
+}
+
+// ========== 存到 Sheets ==========
+async function saveToSheets() {
+  if (!noteGenerated) return;
+  const note = document.getElementById('note-content').textContent;
+
+  if (SHEETS_WEBHOOK === 'YOUR_APPS_SCRIPT_WEBHOOK_URL') {
+    // 尚未設定 webhook，複製到剪貼簿
+    try {
+      await navigator.clipboard.writeText(note);
+      showToast('✓ 已複製到剪貼簿！請手動貼到 Sheets');
+    } catch {
+      showToast('請手動複製上方紀錄');
+    }
+    return;
+  }
+
+  document.getElementById('btn-save').disabled = true;
+  setPill('存檔中...', 'loading');
+  try {
+    const payload = {
+      pharmacy: selectedPharmacy.name,
+      pharmacyId: selectedPharmacy.id,
+      addr: selectedPharmacy.addr,
+      keyMan: selectedPharmacy.keyMan,
+      date: new Date().toLocaleDateString('zh-TW'),
+      note,
+      timestamp: new Date().toISOString()
+    };
+    await fetch(SHEETS_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    setPill('✓ 已儲存', 'gps-ok');
+    showToast('✅ 已成功存入 Google Sheets！');
+  } catch(e) {
+    document.getElementById('btn-save').disabled = false;
+    setPill('存檔失敗', '');
+    showToast('⚠️ 存檔失敗，請檢查 Webhook 設定');
+  }
+}
+
+// ========== 歷史紀錄 ==========
+function renderHistory() {
+  const history = JSON.parse(localStorage.getItem('visit_history') || '[]');
+  const el = document.getElementById('history-list');
+  if (!history.length) { el.innerHTML = '<div class="spinner" style="padding:20px 0">尚無紀錄</div>'; return; }
+  el.innerHTML = history.map(h => `
+    <div style="padding:12px;border:0.5px solid var(--border2);border-radius:${getComputedStyle(document.documentElement).getPropertyValue('--radius')};margin-bottom:8px;cursor:pointer"
+      onclick="toggleNote(this)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <strong style="font-size:14px">${h.pharmacy}</strong>
+        <span style="font-size:12px;color:var(--text2)">${h.date}</span>
+      </div>
+      <div style="display:none;margin-top:8px;font-size:13px;line-height:1.7;white-space:pre-wrap;color:var(--text)">${h.note}</div>
+    </div>`).join('');
+}
+
+function toggleNote(el) {
+  const content = el.querySelector('div:last-child');
+  content.style.display = content.style.display === 'none' ? 'block' : 'none';
+}
+
+function clearHistory() {
+  if (!confirm('確定要清除所有本機紀錄嗎？')) return;
+  localStorage.removeItem('visit_history');
+  renderHistory();
+  showToast('已清除');
+}
+
+// ========== 進度點 ==========
+function resetProgress() {
+  for (let i=0;i<5;i++) document.getElementById(`pd${i}`).className = i===0 ? 'pdot active' : 'pdot';
+}
+function updateProgress() {
+  const n = Math.min(coveredTopics.size, 4);
+  for (let i=0;i<5;i++) {
+    document.getElementById(`pd${i}`).className = i<n ? 'pdot done' : i===n ? 'pdot active' : 'pdot';
+  }
+  if (coveredTopics.size >= 2) document.getElementById('btn-gen').disabled = false;
+}
+
+// ========== UI helpers ==========
+function switchTab(t) {
+  ['pharmacies','record','history'].forEach(id => {
+    document.getElementById(`panel-${id}`).classList.toggle('active', id===t);
+    document.getElementById(`tab-${id}`).classList.toggle('active', id===t);
+  });
+  if (t === 'history') renderHistory();
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); }
+}
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+function setPill(text, cls) {
+  const el = document.getElementById('status-pill');
+  el.textContent = text;
+  el.className = 'status-pill' + (cls ? ` ${cls}` : '');
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// ========== 語音輸入 ==========
+function toggleMic() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { showToast('請使用 Chrome 以支援語音輸入'); return; }
+  if (isRecording) { recognition?.stop(); return; }
+  recognition = new SR();
+  recognition.lang = 'zh-TW';
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.onstart = () => {
+    isRecording = true;
+    document.getElementById('mic-btn').classList.add('recording');
+    document.getElementById('mic-btn').textContent = '⏹';
+  };
+  recognition.onresult = e => {
+    const t = Array.from(e.results).map(r => r[0].transcript).join('');
+    const input = document.getElementById('msg-input');
+    input.value = t; autoResize(input);
+  };
+  recognition.onend = () => {
+    isRecording = false;
+    document.getElementById('mic-btn').classList.remove('recording');
+    document.getElementById('mic-btn').textContent = '🎤';
+  };
+  recognition.start();
+}
+
+// ========== 手動新增藥局 ==========
+function addPharmacy() {
+  const name = document.getElementById('add-name').value.trim();
+  if (!name) { showToast('請輸入藥局名稱'); return; }
+  const lat = parseFloat(document.getElementById('add-lat').value);
+  const lng = parseFloat(document.getElementById('add-lng').value);
+  if (!lat || !lng) { showToast('請先抓取 GPS 位置'); return; }
+  pharmacies.push({ id: 'manual_' + Date.now(), name, addr: document.getElementById('add-addr').value, lat, lng, keyMan: '', title: '藥師' });
+  localStorage.setItem('pharma_cache', JSON.stringify(pharmacies));
+  document.getElementById('add-name').value = '';
+  document.getElementById('add-addr').value = '';
+  document.getElementById('add-lat').value = '';
+  document.getElementById('add-lng').value = '';
+  renderList();
+  showToast(`✓ 已新增「${name}」`);
+}
+
+// ========== 啟動 ==========
+init();
+</script>
+</body>
+</html>
