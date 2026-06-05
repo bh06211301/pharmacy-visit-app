@@ -300,6 +300,15 @@ hr { border: none; border-top: 0.5px solid var(--border2); margin: 14px 0; }
       <span id="sel-dist" style="margin-left:auto;font-size:11px;font-weight:400;"></span>
     </div>
 
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:var(--bg2);border-radius:var(--radius-sm);border:0.5px solid var(--border2);margin-bottom:10px">
+      <span style="font-size:13px;color:var(--text)">🔊 語音回覆</span>
+      <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer">
+        <input type="checkbox" id="voice-toggle" style="opacity:0;width:0;height:0" onchange="toggleVoice(this.checked)">
+        <span id="voice-slider" style="position:absolute;top:0;left:0;right:0;bottom:0;background:var(--bg3);border-radius:12px;transition:0.3s"></span>
+        <span id="voice-knob" style="position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:0.3s;box-shadow:0 1px 3px rgba(0,0,0,0.2)"></span>
+      </label>
+    </div>
+
     <div class="nfc-tip">
       📲 <strong>NFC 使用方式：</strong>將本 App 網址寫入 NFC 貼片，貼在車上。上車掃一下 → 自動開啟並定位最近藥局。
     </div>
@@ -674,6 +683,7 @@ Key person：${selectedPharmacy.keyMan ? `${selectedPharmacy.title} ${selectedPh
     typing.classList.remove('show');
     chatHistory.push({ role: 'assistant', content: reply });
     addBubble(reply, 'ai');
+    speak(reply);
     if (coveredTopics.size >= 2) document.getElementById('btn-gen').disabled = false;
   } catch(e) {
     typing.classList.remove('show');
@@ -841,6 +851,45 @@ function showToast(msg) {
   el.textContent = msg;
   el.classList.add('show');
   setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// ========== 語音回覆 ==========
+let voiceEnabled = false;
+let currentUtterance = null;
+
+function toggleVoice(enabled) {
+  voiceEnabled = enabled;
+  const slider = document.getElementById('voice-slider');
+  const knob = document.getElementById('voice-knob');
+  if (enabled) {
+    slider.style.background = 'var(--green)';
+    knob.style.transform = 'translateX(20px)';
+    showToast('🔊 語音回覆已開啟');
+    // 測試語音
+    speak('語音回覆已開啟');
+  } else {
+    slider.style.background = 'var(--bg3)';
+    knob.style.transform = 'translateX(0)';
+    if (currentUtterance) window.speechSynthesis.cancel();
+    showToast('語音回覆已關閉');
+  }
+}
+
+function speak(text) {
+  if (!voiceEnabled || !window.speechSynthesis) return;
+  if (currentUtterance) window.speechSynthesis.cancel();
+  
+  currentUtterance = new SpeechSynthesisUtterance(text);
+  currentUtterance.lang = 'zh-TW';
+  currentUtterance.rate = 1.05;
+  currentUtterance.pitch = 1;
+  
+  // 優先選中文聲音
+  const voices = window.speechSynthesis.getVoices();
+  const zhVoice = voices.find(v => v.lang.includes('zh-TW') || v.lang.includes('zh-HK'));
+  if (zhVoice) currentUtterance.voice = zhVoice;
+  
+  window.speechSynthesis.speak(currentUtterance);
 }
 
 // ========== 語音輸入 ==========
