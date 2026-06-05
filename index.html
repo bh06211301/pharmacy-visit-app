@@ -684,7 +684,10 @@ Key person：${selectedPharmacy.keyMan ? `${selectedPharmacy.title} ${selectedPh
     chatHistory.push({ role: 'assistant', content: reply });
     addBubble(reply, 'ai');
     speak(reply);
-    if (coveredTopics.size >= 2) document.getElementById('btn-gen').disabled = false;
+    // 只要對話超過 2 輪，或涵蓋 2 個以上主題，就啟用產出紀錄
+    if (chatHistory.length >= 4 || coveredTopics.size >= 2) {
+      document.getElementById('btn-gen').disabled = false;
+    }
   } catch(e) {
     typing.classList.remove('show');
     addBubble('⚠️ 網路問題，請稍後再試。', 'ai');
