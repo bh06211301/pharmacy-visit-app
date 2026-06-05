@@ -366,8 +366,12 @@ async function callGemini(systemPrompt, messages) {
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
-  if (data.error) throw new Error(data.error);
-  return data.text || '';
+  if (data.error) throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
+  // 支援多種回傳格式
+  return data.text 
+    || data.choices?.[0]?.message?.content 
+    || data.candidates?.[0]?.content?.parts?.[0]?.text 
+    || JSON.stringify(data);
 }
 
 // ★ 請填入你的 Google Apps Script Webhook URL（部署後貼入）
