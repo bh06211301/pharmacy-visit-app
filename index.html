@@ -134,6 +134,16 @@ input:focus, textarea:focus { border-color: var(--text); }
 .spinner { text-align: center; padding: 20px; color: var(--text2); font-size: 13px; }
 
 /* Selected banner */
+.visit-type-btn {
+  padding: 6px 14px; font-size: 13px; border-radius: 20px;
+  border: 0.5px solid var(--border); background: var(--bg2);
+  color: var(--text2); cursor: pointer; transition: all 0.15s;
+}
+.visit-type-btn.active {
+  background: var(--text); color: var(--bg); border-color: var(--text);
+}
+.visit-type-btn:active { opacity: 0.7; }
+
 .selected-banner {
   display: none; padding: 10px 14px; border-radius: var(--radius);
   background: var(--green-bg); border: 0.5px solid var(--green);
@@ -300,6 +310,16 @@ hr { border: none; border-top: 0.5px solid var(--border2); margin: 14px 0; }
       <span id="sel-dist" style="margin-left:auto;font-size:11px;font-weight:400;"></span>
     </div>
 
+    <div style="margin-bottom:10px">
+      <div style="font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.06em;margin-bottom:6px">拜訪目的</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="visit-type-btn active" onclick="selectVisitType(this,'送貨')">📦 送貨</button>
+        <button class="visit-type-btn" onclick="selectVisitType(this,'巡視')">👀 巡視</button>
+        <button class="visit-type-btn" onclick="selectVisitType(this,'收款')">💰 收款</button>
+        <button class="visit-type-btn" onclick="selectVisitType(this,'新案開發')">🌱 新案開發</button>
+      </div>
+    </div>
+
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:var(--bg2);border-radius:var(--radius-sm);border:0.5px solid var(--border2);margin-bottom:10px">
       <span style="font-size:13px;color:var(--text)">🔊 語音回覆</span>
       <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer">
@@ -394,6 +414,7 @@ let pharmacies = [];
 let userLat = null, userLng = null;
 let selectedPharmacy = null;
 let chatHistory = [];
+let visitType = '送貨';
 let coveredTopics = new Set();
 let noteGenerated = false;
 let isRecording = false;
@@ -564,6 +585,13 @@ function autoSelectNearest() {
   }
 }
 
+// ========== 拜訪目的 ==========
+function selectVisitType(btn, type) {
+  visitType = type;
+  document.querySelectorAll('.visit-type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
 // ========== 測試模式 ==========
 function populateTestSelect() {
   const sel = document.getElementById('test-select');
@@ -695,33 +723,63 @@ Key person：${selectedPharmacy.keyMan ? `${selectedPharmacy.title} ${selectedPh
 }
 
 // ========== 產出紀錄 ==========
+// 儲存 AI 產出的結構化資料
+let generatedData = {};
+
 async function generateNote() {
   if (!selectedPharmacy) return;
   document.getElementById('btn-gen').disabled = true;
   setPill('整理中...', 'loading');
 
   const today = new Date().toLocaleDateString('zh-TW');
-  const system = `根據以下對話，整理一份藥局業務拜訪中店紀錄。
-只輸出紀錄本身，不要說明文字，不要 markdown 格式。
+  const keyPerson = selectedPharmacy.keyMan ? `${selectedPharmacy.title} ${selectedPharmacy.keyMan}` : '—';
+  
+  const system = `你是藥局業務拜訪紀錄助手。根據對話內容，輸出純 JSON 格式，不要任何說明文字或 markdown。
 
-【藥局名稱】${selectedPharmacy.name}
-【地址】${selectedPharmacy.addr}
-【拜訪日期】${today}
-【Key Person】${selectedPharmacy.keyMan ? `${selectedPharmacy.title} ${selectedPharmacy.keyMan}` : '—'}
-【客戶反應與抱怨】
-（填入內容，若無則寫「無特別反應」）
-【產品討論與推薦】
-（填入內容）
-【庫存與訂單狀況】
-（填入內容）
-【下次拜訪行動】
-（填入行動項目）
-【其他備註】
-（其他重要事項）`;
+JSON 結構如下：
+{
+  "note": "完整中店紀錄（包含【客戶反應】【產品討論】【庫存與訂單】【下次拜訪行動】【其他備註】各段落）",
+  "summary": "精簡摘要 100字內，包含關鍵人名與重要決策",
+  "pain_points": "客戶痛點或抱怨，多個用逗號分隔，若無則填無",
+  "action_items": "下次行動項目，條列式",
+  "tags": "從以下選填適合的標籤，逗號分隔：競品, 缺貨, 客訴, 價格, 滿意, 其他"
+}
+
+藥局：${selectedPharmacy.id} ${selectedPharmacy.name}
+地址：${selectedPharmacy.addr}
+日期：${today}
+拜訪目的：${visitType}
+Key Person：${keyPerson}`;
 
   try {
-    const note = await callGemini(system, chatHistory);
-    document.getElementById('note-content').textContent = note;
+    const raw = await callGemini(system, chatHistory);
+    
+    // 解析 JSON
+    let parsed;
+    try {
+      const clean = raw.replace(/```json|```/g, '').trim();
+      parsed = JSON.parse(clean);
+    } catch(e) {
+      // 如果 JSON 解析失敗，直接用原文
+      parsed = { note: raw, summary: '', pain_points: '', action_items: '', tags: '' };
+    }
+
+    generatedData = {
+      visitId: Math.random().toString(16).slice(2, 10),
+      pharmacy: selectedPharmacy.id,
+      pharmacyId: selectedPharmacy.id,
+      addr: selectedPharmacy.addr,
+      keyMan: selectedPharmacy.keyMan ? `${selectedPharmacy.title} ${selectedPharmacy.keyMan}` : '',
+      date: today,
+      visitType,
+      note: parsed.note || raw,
+      summary: parsed.summary || '',
+      painPoints: parsed.pain_points || '',
+      actionItems: parsed.action_items || '',
+      tags: parsed.tags || ''
+    };
+
+    document.getElementById('note-content').textContent = generatedData.note;
     document.getElementById('note-box').classList.add('show');
     document.getElementById('btn-save').disabled = false;
     document.getElementById('btn-gen').disabled = false;
@@ -730,12 +788,7 @@ async function generateNote() {
 
     // 存本地歷史
     const history = JSON.parse(localStorage.getItem('visit_history') || '[]');
-    history.unshift({
-      id: Date.now(),
-      pharmacy: selectedPharmacy.name,
-      date: today,
-      note
-    });
+    history.unshift({ id: Date.now(), pharmacy: selectedPharmacy.name, date: today, note: generatedData.note });
     localStorage.setItem('visit_history', JSON.stringify(history.slice(0, 50)));
   } catch(e) {
     document.getElementById('btn-gen').disabled = false;
@@ -752,20 +805,11 @@ async function saveToSheets() {
   document.getElementById('btn-save').disabled = true;
   setPill('存檔中...', 'loading');
   try {
-    const payload = {
-      pharmacy: selectedPharmacy.name,
-      pharmacyId: selectedPharmacy.id,
-      addr: selectedPharmacy.addr,
-      keyMan: selectedPharmacy.keyMan ? `${selectedPharmacy.title} ${selectedPharmacy.keyMan}` : '',
-      date: new Date().toLocaleDateString('zh-TW'),
-      note,
-      timestamp: new Date().toISOString()
-    };
     // 透過 Cloudflare Worker 轉發，避免 CORS 問題
     const res = await fetch(WORKER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'sheets', payload })
+      body: JSON.stringify({ type: 'sheets', payload: generatedData })
     });
     const data = await res.json();
     if (data.success === false) throw new Error(data.error || '存檔失敗');
