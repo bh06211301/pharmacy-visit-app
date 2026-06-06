@@ -111,7 +111,8 @@ input:focus, textarea:focus { border-color: var(--text); }
 .btn-sm:active { background: var(--bg3); }
 
 /* Pharmacy list */
-.pharma-list { display: flex; flex-direction: column; gap: 6px; }
+.pharma-list { display: flex; flex-direction: column; gap: 6px; max-height: 210px; overflow-y: auto; scroll-snap-type: y mandatory; }
+.pharma-card { scroll-snap-align: start; }
 .pharma-card {
   padding: 11px 13px; border-radius: var(--radius);
   border: 0.5px solid var(--border2); background: var(--bg);
@@ -278,18 +279,7 @@ hr { border: none; border-top: 0.5px solid var(--border2); margin: 14px 0; }
       <div class="spinner">⏳ 載入中...</div>
     </div>
 
-    <hr>
-    <div class="section-label">手動新增藥局</div>
-    <div class="add-form">
-      <input id="add-name" placeholder="藥局名稱" />
-      <input id="add-addr" placeholder="地址（選填）" />
-      <div class="loc-input-row">
-        <input id="add-lat" placeholder="緯度" readonly />
-        <input id="add-lng" placeholder="經度" readonly />
-        <button class="btn-sm" onclick="captureGPS()">📍 抓位置</button>
-      </div>
-      <button class="btn-action" onclick="addPharmacy()" style="margin-top:2px">＋ 新增</button>
-    </div>
+
   </div>
 
   <!-- ===== 紀錄分頁 ===== -->
@@ -510,14 +500,7 @@ function locateMe() {
   }, { enableHighAccuracy: true, timeout: 10000 });
 }
 
-function captureGPS() {
-  if (!navigator.geolocation) { showToast('不支援定位'); return; }
-  navigator.geolocation.getCurrentPosition(pos => {
-    document.getElementById('add-lat').value = pos.coords.latitude.toFixed(6);
-    document.getElementById('add-lng').value = pos.coords.longitude.toFixed(6);
-    showToast('已抓取目前位置');
-  }, () => showToast('定位失敗'));
-}
+
 
 function haversine(lat1, lng1, lat2, lng2) {
   const R = 6371000;
@@ -905,21 +888,7 @@ function toggleMic() {
 }
 
 // ========== 手動新增藥局 ==========
-function addPharmacy() {
-  const name = document.getElementById('add-name').value.trim();
-  if (!name) { showToast('請輸入藥局名稱'); return; }
-  const lat = parseFloat(document.getElementById('add-lat').value);
-  const lng = parseFloat(document.getElementById('add-lng').value);
-  if (!lat || !lng) { showToast('請先抓取 GPS 位置'); return; }
-  pharmacies.push({ id: 'manual_' + Date.now(), name, addr: document.getElementById('add-addr').value, lat, lng, keyMan: '', title: '藥師' });
-  localStorage.setItem('pharma_cache', JSON.stringify(pharmacies));
-  document.getElementById('add-name').value = '';
-  document.getElementById('add-addr').value = '';
-  document.getElementById('add-lat').value = '';
-  document.getElementById('add-lng').value = '';
-  renderList();
-  showToast(`✓ 已新增「${name}」`);
-}
+
 
 // ========== 啟動 ==========
 init();
