@@ -273,16 +273,6 @@ hr { border: none; border-top: 0.5px solid var(--border2); margin: 14px 0; }
       <button class="btn-sm" onclick="locateMe()">📡 定位</button>
     </div>
 
-    <div style="margin-bottom:10px;padding:10px 12px;background:var(--bg2);border-radius:var(--radius-sm);border:0.5px dashed var(--border)">
-      <div style="font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.06em;margin-bottom:8px">🧪 測試模式（模擬到訪）</div>
-      <select id="test-select" style="width:100%;padding:8px 10px;font-size:13px;background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--radius-sm);color:var(--text);margin-bottom:8px;font-family:var(--font)">
-        <option value="">— 選一家藥局來模擬 —</option>
-      </select>
-      <button class="btn-action" onclick="simulateVisit()" style="height:36px;font-size:13px;width:100%">
-        📍 模擬我就在這家旁邊（自動跳到紀錄）
-      </button>
-    </div>
-
     <div class="section-label">附近與客戶清單</div>
     <div class="pharma-list" id="pharma-list">
       <div class="spinner">⏳ 載入中...</div>
@@ -406,8 +396,6 @@ async function callGemini(systemPrompt, messages) {
 // ★ 請填入你的 Google Apps Script Webhook URL（部署後貼入）
 const SHEETS_WEBHOOK = 'https://script.google.com/macros/s/AKfycbxBDS60OKaAhxeS53qrN7O1TbbN_wHSaJgwKJeFVjgr8ZuxpS-RV6aRu-uEwTJwKvzN9g/exec';
 
-// Google Sheets 公開讀取（CSV 匯出）
-const SHEETS_CSV_URL = 'https://docs.google.com/spreadsheets/d/1qJ62K5Hd2bKP9DdQTjwJOOy0njNICMSPiayW7YJZdNM/export?format=csv&sheet=新客戶資料表_AppSheet';
 
 // ========== 狀態 ==========
 let pharmacies = [];
@@ -441,26 +429,21 @@ async function init() {
 async function fetchFromSheets() {
   try {
     setPill('載入中...', 'loading');
-    const res = await fetch(SHEETS_CSV_URL);
+    // 透過 Cloudflare Worker 讀取，避免 CORS 問題
+    const res = await fetch(WORKER_URL.replace(/\/$/, '') + '/pharmacies');
     const text = await res.text();
-    pharmacies = parseCSV(text);
-    localStorage.setItem('pharma_cache', JSON.stringify(pharmacies));
-    localStorage.setItem('pharma_cache_time', Date.now().toString());
-    renderList();
-    populateTestSelect();
-    setPill('已同步', 'gps-ok');
-    setTimeout(() => setPill('準備中', ''), 2000);
-  } catch (e) {
-    // 若網路失敗，讀本地
-    const fallback = localStorage.getItem('pharma_cache');
-    if (fallback) {
-      pharmacies = JSON.parse(fallback);
+    const fresh = parseCSV(text);
+    if (fresh.length > 0) {
+      pharmacies = fresh;
+      localStorage.setItem('pharma_cache', JSON.stringify(pharmacies));
+      localStorage.setItem('pharma_cache_time', Date.now().toString());
       renderList();
-      populateTestSelect();
-      showToast('使用暫存資料（無網路）');
-    } else {
-      document.getElementById('pharma-list').innerHTML = '<div class="spinner">⚠️ 無法載入，請確認網路</div>';
+      setPill('已同步', 'gps-ok');
+      setTimeout(() => setPill('準備中', ''), 2000);
     }
+  } catch (e) {
+    showToast('使用內建資料（無法同步）');
+    setPill('準備中', '');
   }
 }
 
@@ -592,44 +575,7 @@ function selectVisitType(btn, type) {
   btn.classList.add('active');
 }
 
-// ========== 測試模式 ==========
-function populateTestSelect() {
-  const sel = document.getElementById('test-select');
-  if (!sel || pharmacies.length === 0) return;
-  sel.innerHTML = '<option value="">— 選一家藥局來模擬 —</option>';
-  [...pharmacies].sort((a,b) => a.name.localeCompare(b.name, 'zh')).forEach((p, i) => {
-    const opt = document.createElement('option');
-    opt.value = i;
-    opt.textContent = `${p.name}（${p.addr ? p.addr.slice(0,12) : '—'}）`;
-    sel.appendChild(opt);
-  });
-}
 
-function simulateVisit() {
-  const sel = document.getElementById('test-select');
-  const idx = sel.value;
-  if (idx === '') { showToast('請先選一家藥局'); return; }
-  const sorted = [...pharmacies].sort((a,b) => a.name.localeCompare(b.name, 'zh'));
-  const p = sorted[parseInt(idx)];
-  if (!p) return;
-
-  // 模擬 GPS 就在藥局旁邊 50m 處
-  const fakeLat = p.lat + 0.0003;
-  const fakeLng = p.lng + 0.0003;
-  userLat = fakeLat;
-  userLng = fakeLng;
-
-  const dist = Math.round(haversine(userLat, userLng, p.lat, p.lng));
-  const dot = document.getElementById('gps-dot');
-  dot.className = 'gps-indicator on';
-  document.getElementById('gps-text').textContent = `🧪 測試模式：模擬在 ${p.name} 附近`;
-  setPill('測試中', 'gps-ok');
-
-  selectPharmacy({ ...p, dist });
-  renderList();
-  showToast(`🧪 模擬到訪「${p.name}」（距離 ${dist}m）`);
-  switchTab('record');
-}
 
 function selectPharmacy(p) {
   selectedPharmacy = p;
