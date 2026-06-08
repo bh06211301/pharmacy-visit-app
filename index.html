@@ -153,6 +153,137 @@ input:focus, textarea:focus { border-color: var(--text); }
 }
 .selected-banner.show { display: flex; }
 
+/* ── 拜訪前提醒卡片 ── */
+.briefing-card {
+  display: none;
+  margin-bottom: 12px;
+  border-radius: var(--radius);
+  border: 0.5px solid var(--border);
+  overflow: hidden;
+  transition: all 0.3s;
+}
+.briefing-card.show { display: block; }
+
+.briefing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg2);
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 0.5px solid transparent;
+  transition: border-color 0.2s;
+}
+.briefing-header.expanded { border-color: var(--border2); }
+
+.briefing-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.briefing-badge {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--green-bg);
+  color: var(--green);
+  font-weight: 600;
+  border: 0.5px solid var(--green);
+}
+.briefing-badge.loading-badge {
+  background: #fff8e6;
+  color: #b8860b;
+  border-color: #f0c040;
+}
+.briefing-badge.error-badge {
+  background: #ffe6e6;
+  color: #e24b4a;
+  border-color: #e24b4a;
+}
+.briefing-toggle {
+  font-size: 11px;
+  color: var(--text2);
+  transition: transform 0.2s;
+}
+.briefing-toggle.open { transform: rotate(180deg); }
+
+.briefing-body {
+  display: none;
+  padding: 14px;
+  background: var(--bg);
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--text);
+}
+.briefing-body.show { display: block; }
+
+.b-section { margin-bottom: 12px; }
+.b-section:last-child { margin-bottom: 0; }
+.b-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text2);
+  margin-bottom: 5px;
+}
+.b-content {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+.b-tag {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  color: var(--text2);
+  margin: 2px 3px 2px 0;
+}
+.b-tag.highlight {
+  background: var(--green-bg);
+  color: var(--green);
+  border-color: var(--green);
+}
+.b-skeleton {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--bg2) 25%, var(--bg3) 50%, var(--bg2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  margin-bottom: 8px;
+}
+.b-skeleton.w60 { width: 60%; }
+.b-skeleton.w80 { width: 80%; }
+.b-skeleton.w45 { width: 45%; }
+.b-skeleton.w70 { width: 70%; }
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.briefing-speak-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 0.5px solid var(--border);
+  background: var(--bg2);
+  color: var(--text2);
+  cursor: pointer;
+  margin-top: 8px;
+  transition: all 0.15s;
+}
+.briefing-speak-btn:active { background: var(--bg3); }
+
 /* Progress */
 .progress-row { display: flex; gap: 5px; justify-content: center; margin-bottom: 10px; }
 .pdot { width: 7px; height: 7px; border-radius: 50%; background: var(--bg3); transition: all 0.3s; }
@@ -300,18 +431,40 @@ hr { border: none; border-top: 0.5px solid var(--border2); margin: 14px 0; }
     <div class="pharma-list" id="pharma-list">
       <div class="spinner">⏳ 載入中...</div>
     </div>
-
-
   </div>
 
   <!-- ===== 紀錄分頁 ===== -->
   <div class="panel" id="panel-record">
+
+    <!-- 已選藥局 banner -->
     <div class="selected-banner" id="selected-banner">
       <span>🏪</span>
       <span id="sel-name">—</span>
       <span id="sel-dist" style="margin-left:auto;font-size:11px;font-weight:400;"></span>
     </div>
 
+    <!-- ★ 拜訪前提醒卡片 -->
+    <div id="briefing-card" class="briefing-card">
+      <div class="briefing-header" id="briefing-header" onclick="toggleBriefing()">
+        <div class="briefing-header-left">
+          <span>📋</span>
+          <span>拜訪前提醒</span>
+          <span class="briefing-badge loading-badge" id="briefing-badge">載入中</span>
+        </div>
+        <span class="briefing-toggle" id="briefing-toggle">▼</span>
+      </div>
+      <div class="briefing-body" id="briefing-body">
+        <div id="briefing-skeleton">
+          <div class="b-skeleton w60"></div>
+          <div class="b-skeleton w80"></div>
+          <div class="b-skeleton w45"></div>
+          <div class="b-skeleton w70"></div>
+        </div>
+        <div id="briefing-content" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- 拜訪目的 -->
     <div style="margin-bottom:10px">
       <div style="font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.06em;margin-bottom:6px">拜訪目的</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -322,6 +475,7 @@ hr { border: none; border-top: 0.5px solid var(--border2); margin: 14px 0; }
       </div>
     </div>
 
+    <!-- 語音回覆 toggle -->
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 13px;background:var(--bg2);border-radius:var(--radius-sm);border:0.5px solid var(--border2);margin-bottom:10px">
       <span style="font-size:13px;color:var(--text)">🔊 語音回覆</span>
       <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer">
@@ -331,8 +485,7 @@ hr { border: none; border-top: 0.5px solid var(--border2); margin: 14px 0; }
       </label>
     </div>
 
-
-
+    <!-- 進度點 -->
     <div class="progress-row" id="progress-row">
       <div class="pdot active" id="pd0"></div>
       <div class="pdot" id="pd1"></div>
@@ -341,6 +494,7 @@ hr { border: none; border-top: 0.5px solid var(--border2); margin: 14px 0; }
       <div class="pdot" id="pd4"></div>
     </div>
 
+    <!-- 對話區 -->
     <div class="chat-wrap" id="chat-wrap">
       <div class="bubble ai">
         <div class="bubble-body">請先到「藥局」分頁，點選今天拜訪的藥局，再回來這裡開始紀錄。</div>
@@ -379,10 +533,16 @@ hr { border: none; border-top: 0.5px solid var(--border2); margin: 14px 0; }
 <div class="toast" id="toast"></div>
 
 <script>
-// ★ Cloudflare Worker 網址（中繼 OpenRouter API）
+// ★ Cloudflare Worker 網址
 const WORKER_URL = 'https://weathered-hall-88a0.bh06211301.workers.dev/';
 
-// API 呼叫封裝函數
+// ★ Google Sheets 拜訪紀錄表 CSV（公開讀取）
+const SHEETS_CSV_URL = 'https://docs.google.com/spreadsheets/d/10rofUuKtji4tKGyUv6cvbsiTEq1ynRP0zJxohc3l68U/export?format=csv&gid=0';
+
+// ★ Apps Script Webhook
+const SHEETS_WEBHOOK = 'https://script.google.com/macros/s/AKfycbxBDS60OKaAhxeS53qrN7O1TbbN_wHSaJgwKJeFVjgr8ZuxpS-RV6aRu-uEwTJwKvzN9g/exec';
+
+// API 呼叫封裝
 async function callGemini(systemPrompt, messages) {
   const allMessages = [
     { role: 'system', content: systemPrompt },
@@ -396,16 +556,11 @@ async function callGemini(systemPrompt, messages) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   if (data.error) throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
-  // 支援多種回傳格式
-  return data.text 
-    || data.choices?.[0]?.message?.content 
-    || data.candidates?.[0]?.content?.parts?.[0]?.text 
+  return data.text
+    || data.choices?.[0]?.message?.content
+    || data.candidates?.[0]?.content?.parts?.[0]?.text
     || JSON.stringify(data);
 }
-
-// ★ 請填入你的 Google Apps Script Webhook URL（部署後貼入）
-const SHEETS_WEBHOOK = 'https://script.google.com/macros/s/AKfycbxBDS60OKaAhxeS53qrN7O1TbbN_wHSaJgwKJeFVjgr8ZuxpS-RV6aRu-uEwTJwKvzN9g/exec';
-
 
 // ========== 狀態 ==========
 let pharmacies = [];
@@ -423,26 +578,18 @@ document.getElementById('date-sub').textContent = new Date().toLocaleDateString(
   year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
 });
 
-// ★ 寫死的藥局資料（從 Google Sheets 匯入，共 130 筆）
 const BUILTIN_PHARMACIES = [{"id": "C001", "name": "台北灣藥局", "addr": "新北市淡水區新市一路一段32號", "lat": 25.1867303, "lng": 121.4306687, "title": "藥師", "keyMan": "李庭毅"}, {"id": "C002", "name": "沙崙躍獅藥局", "addr": "新北市淡水區沙崙路189號", "lat": 25.1841192, "lng": 121.4245945, "title": "藥師", "keyMan": "刀哥 喬伊"}, {"id": "C003", "name": "康揚藥局", "addr": "台北市信義區忠孝東路五段412號", "lat": 25.0407211, "lng": 121.575118, "title": "藥師", "keyMan": "陳存洋"}, {"id": "C004", "name": "林口辰安藥局", "addr": "新北市林口區文化3路1段191巷5號", "lat": 25.0651846, "lng": 121.3611066, "title": "藥師", "keyMan": "林承諭"}, {"id": "C005", "name": "富凱昆陽藥局", "addr": "台北市南港區昆陽街140巷8號", "lat": 25.049689, "lng": 121.594014, "title": "藥師", "keyMan": "潘藥師"}, {"id": "C006", "name": "信義辰安藥局", "addr": "桃園市中壢區信義路114號", "lat": 24.9741195, "lng": 121.2574514, "title": "藥師", "keyMan": "黃藥師"}, {"id": "C007", "name": "蘆竹辰安藥局", "addr": "桃園市蘆竹區上興路216號", "lat": 25.018903, "lng": 121.260138, "title": "採購", "keyMan": "副店長"}, {"id": "C008", "name": "美德心藥局", "addr": "新北市林口區公園路63號", "lat": 25.0691641, "lng": 121.3678109, "title": "藥師", "keyMan": "陳家揚"}, {"id": "C009", "name": "艾禾藥局", "addr": "台北市中山區大直街63號", "lat": 25.083539, "lng": 121.546446, "title": "藥師", "keyMan": "林盛元"}, {"id": "C010", "name": "廣興辰安藥局", "addr": "桃園市八德區廣興二路11號", "lat": 24.9330579, "lng": 121.2836689, "title": "藥師", "keyMan": ""}, {"id": "C011", "name": "安捷幸福藥局", "addr": "桃園市中壢區莊敬路100號", "lat": 24.9703317, "lng": 121.2571708, "title": "藥師", "keyMan": "程曉恩"}, {"id": "C012", "name": "力賀藥局", "addr": "新北市中和區連城路7號", "lat": 25.0021165, "lng": 121.4992382, "title": "藥師", "keyMan": "洪偉倫"}, {"id": "C013", "name": "天養藥局", "addr": "台北市士林區中山北路六段262號", "lat": 25.1095898, "lng": 121.5255862, "title": "藥師", "keyMan": "劉晰恬"}, {"id": "C014", "name": "來福藥局", "addr": "新北市新莊區中港路512號", "lat": 25.0518291, "lng": 121.4518398, "title": "藥師", "keyMan": "陳傑宇"}, {"id": "C015", "name": "樂安生活藥局", "addr": "新北市泰山區明志路三段92號", "lat": 25.0413517, "lng": 121.4249118, "title": "藥師", "keyMan": ""}, {"id": "C016", "name": "誠欣藥局", "addr": "桃園市八德區豐德二路2號1樓", "lat": 24.9253906, "lng": 121.286191, "title": "藥師", "keyMan": "蔡志峰"}, {"id": "C017", "name": "柏仁藥局", "addr": "新北市板橋區大觀路三段160巷38號1樓", "lat": 24.994135, "lng": 121.429886, "title": "藥師", "keyMan": "林藥師"}, {"id": "C018", "name": "萬壽辰安藥局", "addr": "桃園市龜山區萬壽路二段1081號", "lat": 24.9939327, "lng": 121.3346002, "title": "藥師", "keyMan": "葉藥師"}, {"id": "C019", "name": "日出藥局", "addr": "台北市南港區玉成街158號一樓", "lat": 25.0449067, "lng": 121.5838648, "title": "藥師", "keyMan": "陳木龍"}, {"id": "C020", "name": "得力藥局", "addr": "新竹縣竹北市福興路528號", "lat": 24.8218269, "lng": 121.0127839, "title": "藥師", "keyMan": "黃彥皓"}, {"id": "C021", "name": "芯羽藥局", "addr": "桃園市龜山區長慶三街66號", "lat": 25.0555398, "lng": 121.3845283, "title": "藥師", "keyMan": "周意玲"}, {"id": "C022", "name": "聯鑫藥師藥局", "addr": "新北市三重區正義北路269號", "lat": 25.0700474, "lng": 121.4954492, "title": "採購", "keyMan": ""}, {"id": "C023", "name": "萬芯中西藥局", "addr": "台北市松山區八德路三段163號", "lat": 25.0481861, "lng": 121.5553382, "title": "藥師", "keyMan": "俞藥師"}, {"id": "C024", "name": "桔子藥局", "addr": "新北市三峽區大德路186號", "lat": 24.9452788, "lng": 121.3758491, "title": "藥師", "keyMan": ""}, {"id": "C025", "name": "中山辰安藥局", "addr": "桃園市中壢區中山東路2段550號1樓", "lat": 24.9465796, "lng": 121.2459483, "title": "藥師", "keyMan": ""}, {"id": "C026", "name": "家赫宇盛藥局", "addr": "台北市士林區中山北路六段218號", "lat": 25.108471, "lng": 121.525418, "title": "藥師", "keyMan": "簡若潔"}, {"id": "C027", "name": "躍獅新民藥局", "addr": "新北市淡水區新民街86號", "lat": 25.1766602, "lng": 121.4384814, "title": "藥師", "keyMan": "勇哥"}, {"id": "C028", "name": "天芮藥局", "addr": "桃園市楊梅區瑞溪路1段252之1號", "lat": 24.907071, "lng": 121.1739359, "title": "藥師", "keyMan": "陳藥師"}, {"id": "C029", "name": "百合藥局", "addr": "新北市中和區秀朗路3段175巷2號1樓", "lat": 24.9908784, "lng": 121.5243476, "title": "藥師", "keyMan": "蔡世雄"}, {"id": "C030", "name": "大愛藥師藥局", "addr": "台北市中山區吉林路255號", "lat": 25.0616622, "lng": 121.5304056, "title": "藥師", "keyMan": "陳藥師"}, {"id": "C031", "name": "美運寶中西藥局", "addr": "新北市鶯歌區永和街56巷4號", "lat": 24.967859, "lng": 121.3335756, "title": "藥師", "keyMan": ""}, {"id": "C032", "name": "沃德藥局", "addr": "桃園市龜山區長壽路137號1樓", "lat": 25.0011324, "lng": 121.342475, "title": "老闆", "keyMan": "郭琮瀚"}, {"id": "C033", "name": "佳德藥局", "addr": "台北市內湖區康寧路三段151號1樓", "lat": 25.070625, "lng": 121.6115302, "title": "藥師", "keyMan": "郭藥師"}, {"id": "C034", "name": "松江健保藥局", "addr": "新北市板橋區松江街72巷12號", "lat": 25.0277745, "lng": 121.4691594, "title": "藥師", "keyMan": "陳維揚"}, {"id": "C035", "name": "大成辰安藥局", "addr": "桃園市楊梅區大成路78號", "lat": 24.9099326, "lng": 121.1458019, "title": "藥師", "keyMan": ""}, {"id": "C036", "name": "金美藥局", "addr": "新北市三峽區大同路238號", "lat": 24.9258088, "lng": 121.3662599, "title": "藥師", "keyMan": "林藥師"}, {"id": "C037", "name": "永印中西健保藥局", "addr": "新北市蘆洲區三民路224號", "lat": 25.0894744, "lng": 121.46872, "title": "藥師", "keyMan": "陳藥師"}, {"id": "C038", "name": "和欣健保藥局", "addr": "新北市土城區學府路1段57號", "lat": 24.9885106, "lng": 121.4597574, "title": "藥師", "keyMan": "鄭世皓"}, {"id": "C040", "name": "小太陽元氣藥局", "addr": "台北市萬華區萬大路433號", "lat": 25.0212001, "lng": 121.4986617, "title": "老闆", "keyMan": ""}, {"id": "C041", "name": "良方藥局", "addr": "新北市樹林區日新街40號1樓", "lat": 24.9925294, "lng": 121.4225797, "title": "藥師", "keyMan": ""}, {"id": "C042", "name": "欣禾藥局", "addr": "桃園市楊梅區新農街407號", "lat": 24.9124809, "lng": 121.157633, "title": "藥師", "keyMan": ""}, {"id": "C043", "name": "大心藥局", "addr": "台北市文山區興隆路2段215號", "lat": 25.0011006, "lng": 121.550086, "title": "藥師", "keyMan": "陳藥師"}, {"id": "C044", "name": "果果藥局", "addr": "新竹縣新豐鄉明新一街2號", "lat": 24.865637, "lng": 120.9893135, "title": "藥師", "keyMan": ""}, {"id": "C045", "name": "仁誠中西藥局", "addr": "桃園市中壢區龍東路284號", "lat": 24.9309431, "lng": 121.2545861, "title": "藥師", "keyMan": "洪藥師"}, {"id": "C046", "name": "富凱延壽藥局", "addr": "台北市松山區延壽街95號", "lat": 25.057205, "lng": 121.5664843, "title": "藥師", "keyMan": ""}, {"id": "C047", "name": "鉅康廖敏昇藥局", "addr": "台北市大同區酒泉街167號", "lat": 25.0721926, "lng": 121.5128735, "title": "老闆", "keyMan": ""}, {"id": "C048", "name": "昱承藥局", "addr": "新北市淡水區新春街96號1樓", "lat": 25.1824327, "lng": 121.4391875, "title": "藥師", "keyMan": "陳慶鴻"}, {"id": "C049", "name": "群康藥局", "addr": "新北市新莊區天祥街96號1樓", "lat": 25.0296705, "lng": 121.4150974, "title": "藥師", "keyMan": "張藥師"}, {"id": "C050", "name": "大豐辰安藥局", "addr": "桃園市大園區大豐二街110號", "lat": 25.0231252, "lng": 121.220058, "title": "藥師", "keyMan": ""}, {"id": "C051", "name": "祐欣藥局", "addr": "新北市汐止區中興路240號1樓", "lat": 25.0680613, "lng": 121.6296706, "title": "藥師", "keyMan": "林祐任"}, {"id": "C052", "name": "安心保健藥局", "addr": "桃園市平鎮區南京路109號", "lat": 24.916206, "lng": 121.2082916, "title": "藥師", "keyMan": "羅藥師"}, {"id": "C053", "name": "德和便利藥局", "addr": "新北市永和區得和路194號", "lat": 24.999633, "lng": 121.520081, "title": "藥師", "keyMan": ""}, {"id": "C054", "name": "浤安藥局", "addr": "桃園市桃園區慈德街1號", "lat": 25.006833, "lng": 121.3019157, "title": "藥師", "keyMan": "楊勝凱"}, {"id": "C055", "name": "安慶藥局", "addr": "桃園市桃園區安慶街91號", "lat": 25.0181352, "lng": 121.2923937, "title": "老闆", "keyMan": "張藥師"}, {"id": "C056", "name": "赫爾振華藥局", "addr": "台北市北投區振華街34號1樓", "lat": 25.115898, "lng": 121.5185562, "title": "藥師", "keyMan": "林宗毅"}, {"id": "C057", "name": "悠樂健保藥局", "addr": "新北市板橋區篤行路2段74號", "lat": 24.9920679, "lng": 121.43146, "title": "藥師", "keyMan": "黃藥師"}, {"id": "C058", "name": "竹東星悅藥局", "addr": "新竹縣竹東鎮光明路260號", "lat": 24.7727575, "lng": 121.056295, "title": "藥師", "keyMan": "李藥師"}, {"id": "C059", "name": "新大賀藥局", "addr": "桃園市平鎮區新榮路259號", "lat": 24.9461617, "lng": 121.2134542, "title": "藥師", "keyMan": "劉耀施"}, {"id": "C060", "name": "關埔中西藥局", "addr": "新竹市東區埔頂三路40號", "lat": 24.7903474, "lng": 121.0125233, "title": "藥師", "keyMan": "彭藥師"}, {"id": "C061", "name": "惠進藥局", "addr": "新北市中和區成功路20號1樓", "lat": 24.9935352, "lng": 121.5260827, "title": "藥師", "keyMan": "周藥師"}, {"id": "C062", "name": "中北生活藥局", "addr": "台北市北投區中央北路一段113號", "lat": 25.134788, "lng": 121.4993512, "title": "藥師", "keyMan": "王藥師"}, {"id": "C063", "name": "安康藥妝藥局", "addr": "新北市深坑區北深路三段175號", "lat": 25.0035579, "lng": 121.6016355, "title": "店長", "keyMan": "謝小姐"}, {"id": "C064", "name": "成家健保藥局", "addr": "新北市中和區中原街116號1樓", "lat": 25.0104874, "lng": 121.4864265, "title": "藥師", "keyMan": "周藥師"}, {"id": "C065", "name": "禾林藥局", "addr": "新北市板橋區民族路300號1樓", "lat": 25.0066638, "lng": 121.4705153, "title": "藥師", "keyMan": "林岑聿"}, {"id": "C066", "name": "知禾藥局", "addr": "桃園市中壢區文發路5號", "lat": 24.9998762, "lng": 121.2108662, "title": "藥師", "keyMan": ""}, {"id": "C067", "name": "永義藥局", "addr": "新北市永和區永貞路81號", "lat": 25.0042906, "lng": 121.5185777, "title": "藥師", "keyMan": "俞藥師"}, {"id": "C068", "name": "拉菈中西藥局", "addr": "桃園市蘆竹區吉林路12號", "lat": 25.0509293, "lng": 121.2963517, "title": "藥師", "keyMan": "劉皓宇"}, {"id": "C069", "name": "易康藥局", "addr": "台北市中山區堤頂大道2段302號", "lat": 25.0783725, "lng": 121.5643243, "title": "藥師", "keyMan": "陳藥師"}, {"id": "C070", "name": "森采藥局", "addr": "桃園市桃園區大業路1段402號1樓", "lat": 25.0032133, "lng": 121.3188343, "title": "藥師", "keyMan": "劉宛盈"}, {"id": "C071", "name": "杏原藥局", "addr": "新北市新莊區福美街132號1樓", "lat": 25.0589429, "lng": 121.4608729, "title": "藥師", "keyMan": "翁藥師"}, {"id": "C072", "name": "柚吉藥局", "addr": "桃園市龜山區萬壽路2段1242之6號1樓", "lat": 24.9939135, "lng": 121.3349325, "title": "藥師", "keyMan": "陳政宏"}, {"id": "C073", "name": "予恩藥局", "addr": "基隆市中正區義二路144號1樓", "lat": 25.1334585, "lng": 121.7470851, "title": "藥師", "keyMan": "游藥師"}, {"id": "C074", "name": "光唯藥局", "addr": "基隆市中正區新豐街432號1樓", "lat": 25.1357521, "lng": 121.7861466, "title": "藥師", "keyMan": "田藥師"}, {"id": "C075", "name": "躍獅思源藥局", "addr": "新北市新莊區頭前路160號", "lat": 25.0527819, "lng": 121.4614878, "title": "藥師", "keyMan": ""}, {"id": "C076", "name": "天杏藥局", "addr": "新北市新店區北新路1段46號1樓", "lat": 24.978282, "lng": 121.5394822, "title": "採購", "keyMan": "郭小姐"}, {"id": "C077", "name": "復泰藥局", "addr": "新北市新店區十四張路389號", "lat": 24.9814995, "lng": 121.5276766, "title": "藥師", "keyMan": "李藥師"}, {"id": "C078", "name": "亮安藥局", "addr": "新北市中和區宜安路2號", "lat": 24.9955402, "lng": 121.5136518, "title": "老闆", "keyMan": "林建良"}, {"id": "C079", "name": "貞心藥局", "addr": "新北市中和區永貞路280之1號1樓", "lat": 25.0040324, "lng": 121.5131663, "title": "藥師", "keyMan": "張傑鈞"}, {"id": "C080", "name": "信毅藥局", "addr": "新北市中和區捷運路56號1樓", "lat": 24.9905727, "lng": 121.5078454, "title": "老闆", "keyMan": "黃騰毅"}, {"id": "C081", "name": "慶華藥師藥局", "addr": "新北市中和區華新街90號1樓", "lat": 24.9830869, "lng": 121.5083532, "title": "藥師", "keyMan": "巫藥師"}, {"id": "C082", "name": "恩溢藥局", "addr": "新北市中和區復興路79號", "lat": 24.9901038, "lng": 121.5035213, "title": "藥師", "keyMan": "李玫緩"}, {"id": "C083", "name": "康荃優生保健藥局", "addr": "新北市中和區福祥路66號1樓", "lat": 25.0048318, "lng": 121.499448, "title": "藥師", "keyMan": "莊禮維"}, {"id": "C084", "name": "田邊藥局", "addr": "新北市中和區泰和街43號一樓", "lat": 25.0003449, "lng": 121.4994875, "title": "老闆", "keyMan": "陳淑芬"}, {"id": "C085", "name": "銓家藥局", "addr": "新北市中和區員山路319號", "lat": 25.0005809, "lng": 121.4811074, "title": "藥師", "keyMan": "李瑞鈞"}, {"id": "C086", "name": "德和便利藥局", "addr": "新北市永和區得和路194號1樓", "lat": 24.9999399, "lng": 121.5201477, "title": "藥師", "keyMan": "陳裕成"}, {"id": "C087", "name": "華興藥師藥局", "addr": "新北市蘆洲區中山一路184號1樓", "lat": 25.0811056, "lng": 121.4739544, "title": "老闆", "keyMan": "巫藥師"}, {"id": "C088", "name": "德康藥局", "addr": "新北市蘆洲區長榮路132號1樓", "lat": 25.0845049, "lng": 121.4615912, "title": "藥師", "keyMan": "蔡鴻瑜"}, {"id": "C089", "name": "大峰藥局", "addr": "新北市板橋區莒光路168號1樓", "lat": 25.0231494, "lng": 121.4740462, "title": "藥師", "keyMan": "陸明達"}, {"id": "C090", "name": "長弘藥局", "addr": "新北市板橋區龍泉街110號", "lat": 25.024569, "lng": 121.456727, "title": "藥師", "keyMan": "辜麗蘭"}, {"id": "C091", "name": "翰林藥局", "addr": "新北市板橋區中正路240號", "lat": 25.0190477, "lng": 121.4557106, "title": "藥師", "keyMan": "黃淑鈴"}, {"id": "C092", "name": "友虹藥師藥局", "addr": "新北市板橋區國光路16號", "lat": 25.0173574, "lng": 121.4570019, "title": "藥師", "keyMan": "洪秋楓"}, {"id": "C093", "name": "薇妮藥妝藥局", "addr": "新北市新莊區民安路99號1樓", "lat": 25.0252636, "lng": 121.424551, "title": "藥師", "keyMan": "吳佩蓉"}, {"id": "C094", "name": "經國藥局", "addr": "桃園市桃園區經國路200號", "lat": 25.0175313, "lng": 121.3053472, "title": "藥師", "keyMan": "康光輝"}, {"id": "C095", "name": "全興藥局", "addr": "桃園市龜山區光峰路153號1樓", "lat": 25.0025863, "lng": 121.3426364, "title": "藥師", "keyMan": "郭世武"}, {"id": "C096", "name": "康泰藥局", "addr": "桃園市桃園區大業路一段323號", "lat": 25.011413, "lng": 121.312704, "title": "藥師", "keyMan": "林育敏"}, {"id": "C097", "name": "杏琳藥局", "addr": "新北市新莊區中平路114號", "lat": 25.0462788, "lng": 121.4449216, "title": "藥師", "keyMan": "陳詠淇"}, {"id": "C098", "name": "新家福藥局", "addr": "桃園市中壢區福州二街419號", "lat": 24.9680043, "lng": 121.2325301, "title": "藥師", "keyMan": "唐小姐"}, {"id": "C099", "name": "泰平藥局", "addr": "新北市樹林區太平路143號", "lat": 24.9799956, "lng": 121.4191215, "title": "藥師", "keyMan": "許志嘉"}, {"id": "C100", "name": "川秀藥局", "addr": "台北市北投區石牌路二段99巷9號一樓", "lat": 25.1188824, "lng": 121.5210654, "title": "藥師", "keyMan": "陳昭星"}, {"id": "C101", "name": "宏安藥局", "addr": "新竹縣湖口鄉中山路二段110號", "lat": 24.901441, "lng": 121.043725, "title": "藥師", "keyMan": "黃藥師"}, {"id": "C102", "name": "樂學辰安藥局", "addr": "桃園市龜山區樂學路498號", "lat": 25.0534943, "lng": 121.3829293, "title": "藥師", "keyMan": "范藥師"}, {"id": "C103", "name": "早安藥局", "addr": "新北市新莊區復興路2段147號", "lat": 25.0445265, "lng": 121.4577583, "title": "藥師", "keyMan": "劉藥師"}, {"id": "C104", "name": "牧風藥局", "addr": "基隆市仁愛區愛二路40號1樓", "lat": 25.1286275, "lng": 121.7419914, "title": "藥師", "keyMan": "宋岳東"}, {"id": "C105", "name": "仁馥中西藥局", "addr": "台北市士林區德行東路11號1樓", "lat": 25.1068146, "lng": 121.5255242, "title": "藥師", "keyMan": "王孟仁"}, {"id": "C106", "name": "歆鈺藥局", "addr": "台北市文山區興隆路四段209號", "lat": 24.9828429, "lng": 121.5625244, "title": "老闆", "keyMan": "何明捷"}, {"id": "C107", "name": "育禾藥局", "addr": "新竹縣竹北市莊敬南路186號", "lat": 24.8155331, "lng": 121.0193507, "title": "藥師", "keyMan": "王佩文"}, {"id": "C108", "name": "綠洲藥局", "addr": "新北市板橋區三民路二段197號", "lat": 25.0138783, "lng": 121.4793687, "title": "藥師", "keyMan": ""}, {"id": "C109", "name": "熊安藥局", "addr": "新北市永和區秀朗路2段229號", "lat": 25.0002339, "lng": 121.5264945, "title": "藥師", "keyMan": "邱光隆"}, {"id": "C110", "name": "湯泉藥師藥局", "addr": "新北市新店區溪園路415號", "lat": 24.9785977, "lng": 121.5245343, "title": "老闆", "keyMan": "彭麗靜"}, {"id": "C111", "name": "唯康藥局", "addr": "桃園市平鎮區中豐路南勢二段144號", "lat": 24.915676, "lng": 121.210506, "title": "藥師", "keyMan": "黑龍"}, {"id": "C112", "name": "躍獅芳心藥局", "addr": "新北市板橋區華江一路596號1樓", "lat": 25.0328194, "lng": 121.4653552, "title": "藥師", "keyMan": ""}, {"id": "C113", "name": "自強藥局", "addr": "新北市三重區自強路一段22號", "lat": 25.0679922, "lng": 121.4986676, "title": "藥師", "keyMan": "柯藥師"}, {"id": "C114", "name": "保康藥局", "addr": "新北市樹林區保安街一段364號", "lat": 24.998588, "lng": 121.417779, "title": "藥師", "keyMan": "廖詹"}, {"id": "C115", "name": "禾宥健保藥局", "addr": "新北市新莊區公園一路30號1樓", "lat": 25.0353085, "lng": 121.4435358, "title": "藥師", "keyMan": "董婉如"}, {"id": "C116", "name": "皇佳大藥局", "addr": "台北市信義區松山路541巷25號1樓", "lat": 25.037978, "lng": 121.5790927, "title": "老闆", "keyMan": "鍾文雅"}, {"id": "C117", "name": "合生藥局", "addr": "台北市松山區南京東路五段123巷45號1樓", "lat": 25.053627, "lng": 121.5607438, "title": "藥師", "keyMan": "邱紹洲"}, {"id": "C118", "name": "佑成藥局", "addr": "新北市新店區民權路101號1樓", "lat": 24.9827604, "lng": 121.5369844, "title": "藥師", "keyMan": "陳祐維"}, {"id": "C119", "name": "祥全藥局", "addr": "台北市中正區信義路二段79巷15號之8一樓", "lat": 25.0355932, "lng": 121.5269914, "title": "藥師", "keyMan": "白昭豐"}, {"id": "C120", "name": "佳民藥局", "addr": "新北市永和區永貞路238號", "lat": 25.0047252, "lng": 121.5119973, "title": "藥師", "keyMan": "魏銘芳"}, {"id": "C121", "name": "東京晟藥局", "addr": "台北市文山區辛亥路四段97號", "lat": 25.0068451, "lng": 121.558766, "title": "藥師", "keyMan": "沈育翰"}, {"id": "C122", "name": "杏仁藥局", "addr": "台北市信義區大道路135號", "lat": 25.0390744, "lng": 121.5833621, "title": "藥師", "keyMan": "簡志穎"}, {"id": "C123", "name": "永康藥局", "addr": "台北市大安區麗水街6-2號", "lat": 25.0328863, "lng": 121.5290188, "title": "藥師", "keyMan": ""}, {"id": "C124", "name": "錦泰藥局", "addr": "基隆市中山區中山二路43號", "lat": 25.1379065, "lng": 121.7405596, "title": "藥師", "keyMan": "徐藥師"}, {"id": "C125", "name": "大麥中西藥局", "addr": "桃園市桃園區龍安街70號", "lat": 24.9886474, "lng": 121.2806659, "title": "藥師", "keyMan": ""}, {"id": "C126", "name": "中日藥局", "addr": "桃園市中壢區中北路二段78號", "lat": 24.9506357, "lng": 121.2251583, "title": "藥師", "keyMan": "邱藥師"}, {"id": "C127", "name": "熊羽藥局", "addr": "新北市土城區中央路1段136號", "lat": 24.991566, "lng": 121.448764, "title": "藥師", "keyMan": "柯博仁"}, {"id": "C128", "name": "美安藥局", "addr": "新北市板橋區金門街268號", "lat": 24.9865044, "lng": 121.4298343, "title": "藥師", "keyMan": ""}, {"id": "C129", "name": "大鳥藥局", "addr": "台北市信義區莊敬路354號", "lat": 25.0276125, "lng": 121.5643388, "title": "藥師", "keyMan": ""}, {"id": "C130", "name": "王佩文", "addr": "新竹縣竹北市中正西路132號", "lat": 24.8405356, "lng": 121.001608, "title": "藥師", "keyMan": ""}, {"id": "C131", "name": "生活大藥局", "addr": "台北市萬華區長沙街二段128號", "lat": 25.0403212, "lng": 121.5035494, "title": "藥師", "keyMan": "簡藥師"}];
 
 async function init() {
-  // 先用寫死資料，確保本地測試和離線都能用
   pharmacies = BUILTIN_PHARMACIES;
   renderList();
-  populateTestSelect();
-
-  // 背景嘗試從 Sheets 同步最新資料（部署後才有效）
   fetchFromSheets().catch(() => {});
-
-  // 自動開啟定位
   locateMe();
 }
 
 async function fetchFromSheets() {
   try {
     setPill('載入中...', 'loading');
-    // 透過 Cloudflare Worker 讀取，避免 CORS 問題
     const res = await fetch(WORKER_URL.replace(/\/$/, '') + '/pharmacies');
     const text = await res.text();
     const fresh = parseCSV(text);
@@ -485,6 +632,21 @@ function parseCSV(text) {
   return result;
 }
 
+// 通用 CSV 解析（回傳物件陣列，用於拜訪紀錄表）
+function parseCSVFull(text) {
+  const lines = text.trim().split('\n');
+  const headers = parseCSVLine(lines[0]);
+  const result = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const vals = parseCSVLine(lines[i]);
+    const obj = {};
+    headers.forEach((h, idx) => { obj[h.trim()] = (vals[idx] || '').trim(); });
+    result.push(obj);
+  }
+  return result;
+}
+
 function parseCSVLine(line) {
   const result = [];
   let cur = '', inQ = false;
@@ -522,8 +684,6 @@ function locateMe() {
     showToast('請在瀏覽器允許定位權限');
   }, { enableHighAccuracy: true, timeout: 10000 });
 }
-
-
 
 function haversine(lat1, lng1, lat2, lng2) {
   const R = 6371000;
@@ -581,8 +741,7 @@ function selectVisitType(btn, type) {
   btn.classList.add('active');
 }
 
-
-
+// ========== 選擇藥局（含拜訪前提醒）==========
 function selectPharmacy(p) {
   selectedPharmacy = p;
   document.getElementById('sel-name').textContent = p.name;
@@ -604,6 +763,9 @@ function selectPharmacy(p) {
   const keyInfo = p.keyMan ? `（${p.title} ${p.keyMan}）` : '';
   addBubble(`已選擇「${p.name}」${keyInfo}。拜訪完了嗎？跟我說說今天發生的事情，不用整理格式，想到什麼說什麼就好。`, 'ai');
   renderList();
+
+  // ★ 載入拜訪前提醒
+  loadVisitBriefing(p);
 }
 
 // ========== 搜尋 ==========
@@ -617,7 +779,7 @@ function filterList(keyword) {
   });
 }
 
-// ========== 新案開發臨時拜訪 ==========
+// ========== 新案開發 ==========
 function showTempVisit() {
   document.getElementById('temp-visit-form').style.display = 'block';
   document.getElementById('temp-name').focus();
@@ -633,32 +795,211 @@ function startTempVisit() {
   const name = document.getElementById('temp-name').value.trim();
   if (!name) { showToast('請輸入店名'); return; }
   const addr = document.getElementById('temp-addr').value.trim();
-  
-  // 建立臨時藥局物件（代號用 NEW- 開頭）
   const tempPharmacy = {
-    id: 'NEW',
-    name: name,
-    addr: addr,
-    lat: userLat || 0,
-    lng: userLng || 0,
-    title: '藥師',
-    keyMan: '',
-    dist: null,
-    isNew: true
+    id: 'NEW', name, addr,
+    lat: userLat || 0, lng: userLng || 0,
+    title: '藥師', keyMan: '', dist: null, isNew: true
   };
-  
   hideTempVisit();
   selectPharmacy(tempPharmacy);
-  // 自動選「新案開發」
   document.querySelectorAll('.visit-type-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.visit-type-btn').forEach(b => {
-    if (b.textContent.includes('新案開發')) {
-      b.classList.add('active');
-      visitType = '新案開發';
-    }
+    if (b.textContent.includes('新案開發')) { b.classList.add('active'); visitType = '新案開發'; }
   });
   switchTab('record');
   showToast(`📋 開始記錄「${name}」`);
+}
+
+// ========== 拜訪前提醒 ==========
+function toggleBriefing() {
+  const body = document.getElementById('briefing-body');
+  const toggle = document.getElementById('briefing-toggle');
+  const header = document.getElementById('briefing-header');
+  const isOpen = body.classList.contains('show');
+  body.classList.toggle('show', !isOpen);
+  toggle.classList.toggle('open', !isOpen);
+  header.classList.toggle('expanded', !isOpen);
+}
+
+function setBriefingBadge(text, type) {
+  const badge = document.getElementById('briefing-badge');
+  badge.textContent = text;
+  badge.className = 'briefing-badge';
+  if (type === 'loading') badge.classList.add('loading-badge');
+  if (type === 'error') badge.classList.add('error-badge');
+}
+
+async function loadVisitBriefing(pharmacy) {
+  const card = document.getElementById('briefing-card');
+  const body = document.getElementById('briefing-body');
+  const skeleton = document.getElementById('briefing-skeleton');
+  const content = document.getElementById('briefing-content');
+  const toggle = document.getElementById('briefing-toggle');
+  const header = document.getElementById('briefing-header');
+
+  // 新案開發沒有歷史
+  if (pharmacy.isNew) {
+    card.classList.remove('show');
+    return;
+  }
+
+  // 重置 UI
+  card.classList.add('show');
+  body.classList.add('show');
+  toggle.classList.add('open');
+  header.classList.add('expanded');
+  skeleton.style.display = 'block';
+  content.style.display = 'none';
+  setBriefingBadge('載入中', 'loading');
+
+  try {
+    // 1. 讀 Sheets CSV
+    const res = await fetch(SHEETS_CSV_URL);
+    if (!res.ok) throw new Error('無法讀取拜訪紀錄表');
+    const csv = await res.text();
+
+    // 2. 解析並過濾該藥局
+    const rows = parseCSVFull(csv);
+    const pharmId = pharmacy.id;
+    const pharmName = pharmacy.name;
+
+    const history = rows.filter(r => {
+      const store = (r['店名'] || '').trim();
+      return store === pharmId || store === pharmName;
+    });
+
+    if (history.length === 0) {
+      skeleton.style.display = 'none';
+      content.style.display = 'block';
+      content.innerHTML = `
+        <div class="b-section">
+          <div class="b-content" style="color:var(--text2)">此藥局尚無拜訪紀錄，這次是首次拜訪 🌱</div>
+        </div>`;
+      setBriefingBadge('首次拜訪', '');
+      return;
+    }
+
+    // 3. 取最近 8 筆，組成文字
+    const recent = history
+      .sort((a, b) => new Date(b['拜訪日期']) - new Date(a['拜訪日期']))
+      .slice(0, 8);
+
+    const historyText = recent.map(r => {
+      const lines = [
+        `日期：${r['拜訪日期']}`,
+        r['拜訪目的'] ? `目的：${r['拜訪目的']}` : '',
+        r['拜訪內容'] ? `內容：${r['拜訪內容']}` : '',
+        r['Summary'] ? `摘要：${r['Summary']}` : '',
+        r['Action Items'] ? `待辦：${r['Action Items']}` : '',
+        r['下次追蹤日'] ? `追蹤日：${r['下次追蹤日']}` : '',
+        r['Tags'] ? `標籤：${r['Tags']}` : '',
+      ].filter(Boolean).join('\n');
+      return `--- 紀錄 ---\n${lines}`;
+    }).join('\n\n');
+
+    const today = new Date().toLocaleDateString('zh-TW');
+    const systemPrompt = `你是醫藥業務的智慧助理，現在要幫業務在拜訪「${pharmName}」之前做提醒。
+今天日期：${today}
+以下是這家藥局的歷史拜訪紀錄（最近 ${recent.length} 筆）：
+
+${historyText}
+
+請整理出以下四個區塊，每個區塊 1-3 句話，簡潔有力，不要廢話：
+1. 上次拜訪：日期、主要內容、結果
+2. 未完成追蹤：有沒有遺留的 Action Items 或約好要做的事情，若無則說「無待追蹤事項」
+3. 客戶特徵：藥師習慣、偏好、禁忌、關係溫度
+4. 今次建議切入點：根據歷史，這次拜訪最好怎麼開場或推進
+
+只輸出純 JSON，不要 markdown 也不要說明文字：
+{"last_visit":"...","pending":"...","profile":"...","suggestion":"..."}`;
+
+    // 4. 呼叫 AI
+    const aiRes = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: '請整理拜訪前提醒。' }
+        ]
+      })
+    });
+    if (!aiRes.ok) throw new Error(`AI 請求失敗 ${aiRes.status}`);
+    const aiData = await aiRes.json();
+    const rawText = aiData.text || aiData.choices?.[0]?.message?.content || '';
+
+    // 5. 解析 JSON
+    let brief;
+    try {
+      const cleaned = rawText.replace(/```json|```/g, '').trim();
+      // 只取第一個 { } 範圍（避免 AI 多輸出文字）
+      const match = cleaned.match(/\{[\s\S]*\}/);
+      brief = JSON.parse(match ? match[0] : cleaned);
+    } catch {
+      throw new Error('AI 回傳格式錯誤');
+    }
+
+    // 6. 渲染
+    const pendingCount = recent.filter(r =>
+      r['Action Items'] && r['Action Items'].length > 5 && !r['AI Status']?.includes('Error')
+    ).length;
+
+    skeleton.style.display = 'none';
+    content.style.display = 'block';
+    content.innerHTML = buildBriefingHTML(brief, history.length, pendingCount);
+    setBriefingBadge(`共 ${history.length} 筆`, '');
+
+    // 7. 若語音開啟則自動播報
+    if (voiceEnabled) {
+      speak(`拜訪前提醒。上次拜訪：${brief.last_visit}。建議切入點：${brief.suggestion}`);
+    }
+
+  } catch (err) {
+    console.error('briefing error', err);
+    skeleton.style.display = 'none';
+    content.style.display = 'block';
+    content.innerHTML = `<div class="b-content" style="color:var(--text2)">⚠️ 無法載入：${err.message}</div>`;
+    setBriefingBadge('載入失敗', 'error');
+  }
+}
+
+function buildBriefingHTML(brief, totalCount, pendingCount) {
+  const sections = [
+    { label: '🗓 上次拜訪', key: 'last_visit' },
+    { label: '⚠️ 未完成追蹤', key: 'pending' },
+    { label: '👤 客戶特徵', key: 'profile' },
+    { label: '💡 建議切入點', key: 'suggestion' },
+  ];
+  let html = sections.map(s => `
+    <div class="b-section">
+      <div class="b-label">${s.label}</div>
+      <div class="b-content">${escapeHtml(brief[s.key] || '—')}</div>
+    </div>`).join('');
+
+  html += `
+    <div style="margin-top:10px;padding-top:10px;border-top:0.5px solid var(--border2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+      <div>
+        <span class="b-tag highlight">共 ${totalCount} 筆紀錄</span>
+        ${pendingCount > 0 ? `<span class="b-tag highlight">${pendingCount} 項有待辦</span>` : ''}
+      </div>
+      <button class="briefing-speak-btn" onclick="speakBriefingData(${JSON.stringify(JSON.stringify(brief))})">🔊 播報提醒</button>
+    </div>`;
+  return html;
+}
+
+function speakBriefingData(briefJson) {
+  try {
+    const brief = JSON.parse(briefJson);
+    speak(`拜訪前提醒。上次拜訪：${brief.last_visit}。未完成追蹤：${brief.pending}。建議切入點：${brief.suggestion}`);
+  } catch(e) {}
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br>');
 }
 
 // ========== 聊天 ==========
@@ -690,7 +1031,6 @@ async function sendMsg() {
   addBubble(text, 'user');
   chatHistory.push({ role: 'user', content: text });
 
-  // 關鍵字偵測
   for (const [topic, kws] of Object.entries(KEYWORDS)) {
     if (!coveredTopics.has(topic) && kws.some(k => text.includes(k))) coveredTopics.add(topic);
   }
@@ -719,7 +1059,6 @@ Key person：${selectedPharmacy.keyMan ? `${selectedPharmacy.title} ${selectedPh
     chatHistory.push({ role: 'assistant', content: reply });
     addBubble(reply, 'ai');
     speak(reply);
-    // 只要對話超過 2 輪，或涵蓋 2 個以上主題，就啟用產出紀錄
     if (chatHistory.length >= 4 || coveredTopics.size >= 2) {
       document.getElementById('btn-gen').disabled = false;
     }
@@ -730,7 +1069,6 @@ Key person：${selectedPharmacy.keyMan ? `${selectedPharmacy.title} ${selectedPh
 }
 
 // ========== 產出紀錄 ==========
-// 儲存 AI 產出的結構化資料
 let generatedData = {};
 
 async function generateNote() {
@@ -740,7 +1078,7 @@ async function generateNote() {
 
   const today = new Date().toLocaleDateString('zh-TW');
   const keyPerson = selectedPharmacy.keyMan ? `${selectedPharmacy.title} ${selectedPharmacy.keyMan}` : '—';
-  
+
   const system = `你是藥局業務拜訪紀錄助手。根據對話內容，輸出純 JSON 格式，不要任何說明文字或 markdown。
 
 JSON 結構如下：
@@ -760,18 +1098,14 @@ Key Person：${keyPerson}`;
 
   try {
     const raw = await callGemini(system, chatHistory);
-    
-    // 解析 JSON
     let parsed;
     try {
       const clean = raw.replace(/```json|```/g, '').trim();
       parsed = JSON.parse(clean);
     } catch(e) {
-      // 如果 JSON 解析失敗，直接用原文
       parsed = { note: raw, summary: '', pain_points: '', action_items: '', tags: '' };
     }
 
-    // 新案開發的店家用 NEW-店名 格式
     const pharmacyCode = selectedPharmacy.isNew
       ? `NEW-${selectedPharmacy.name}`
       : selectedPharmacy.id;
@@ -798,7 +1132,6 @@ Key Person：${keyPerson}`;
     noteGenerated = true;
     setPill('✓ 完成', 'gps-ok');
 
-    // 存本地歷史
     const history = JSON.parse(localStorage.getItem('visit_history') || '[]');
     history.unshift({ id: Date.now(), pharmacy: selectedPharmacy.name, date: today, note: generatedData.note });
     localStorage.setItem('visit_history', JSON.stringify(history.slice(0, 50)));
@@ -812,12 +1145,9 @@ Key Person：${keyPerson}`;
 // ========== 存到 Sheets ==========
 async function saveToSheets() {
   if (!noteGenerated) return;
-  const note = document.getElementById('note-content').textContent;
-
   document.getElementById('btn-save').disabled = true;
   setPill('存檔中...', 'loading');
   try {
-    // 透過 Cloudflare Worker 轉發，避免 CORS 問題
     const res = await fetch(WORKER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -840,7 +1170,7 @@ function renderHistory() {
   const el = document.getElementById('history-list');
   if (!history.length) { el.innerHTML = '<div class="spinner" style="padding:20px 0">尚無紀錄</div>'; return; }
   el.innerHTML = history.map(h => `
-    <div style="padding:12px;border:0.5px solid var(--border2);border-radius:${getComputedStyle(document.documentElement).getPropertyValue('--radius')};margin-bottom:8px;cursor:pointer"
+    <div style="padding:12px;border:0.5px solid var(--border2);border-radius:var(--radius);margin-bottom:8px;cursor:pointer"
       onclick="toggleNote(this)">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <strong style="font-size:14px">${h.pharmacy}</strong>
@@ -916,7 +1246,6 @@ function toggleVoice(enabled) {
     slider.style.background = 'var(--green)';
     knob.style.transform = 'translateX(20px)';
     showToast('🔊 語音回覆已開啟');
-    // 測試語音
     speak('語音回覆已開啟');
   } else {
     slider.style.background = 'var(--bg3)';
@@ -970,9 +1299,6 @@ function toggleMic() {
   };
   recognition.start();
 }
-
-// ========== 手動新增藥局 ==========
-
 
 // ========== 啟動 ==========
 init();
