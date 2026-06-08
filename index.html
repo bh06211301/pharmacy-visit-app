@@ -926,21 +926,22 @@ function toggleVoice(enabled) {
   }
 }
 
-function speak(text) {
-  if (!voiceEnabled || !window.speechSynthesis) return;
-  if (currentUtterance) window.speechSynthesis.cancel();
-  
-  currentUtterance = new SpeechSynthesisUtterance(text);
-  currentUtterance.lang = 'zh-TW';
-  currentUtterance.rate = 1.05;
-  currentUtterance.pitch = 1;
-  
-  // 優先選中文聲音
-  const voices = window.speechSynthesis.getVoices();
-  const zhVoice = voices.find(v => v.lang.includes('zh-TW') || v.lang.includes('zh-HK'));
-  if (zhVoice) currentUtterance.voice = zhVoice;
-  
-  window.speechSynthesis.speak(currentUtterance);
+async function speak(text) {
+  if (!voiceEnabled || !text) return;
+  try {
+    const res = await fetch(WORKER_URL.replace(/\/$/, '') + '/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const audioUrl = URL.createObjectURL(blob);
+    const audio = new Audio(audioUrl);
+    audio.play();
+  } catch(e) {
+    console.warn('TTS 失敗', e);
+  }
 }
 
 // ========== 語音輸入 ==========
