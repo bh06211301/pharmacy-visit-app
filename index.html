@@ -436,6 +436,9 @@ async function init() {
 
   // 背景嘗試從 Sheets 同步最新資料（部署後才有效）
   fetchFromSheets().catch(() => {});
+
+  // 自動開啟定位
+  locateMe();
 }
 
 async function fetchFromSheets() {
