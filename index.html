@@ -111,7 +111,7 @@ input:focus, textarea:focus { border-color: var(--text); }
 .btn-sm:active { background: var(--bg3); }
 
 /* Pharmacy list */
-.pharma-list { display: flex; flex-direction: column; gap: 6px; max-height: 210px; overflow-y: auto; scroll-snap-type: y mandatory; }
+.pharma-list { display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow-y: auto; scroll-snap-type: y mandatory; }
 .pharma-card { scroll-snap-align: start; }
 .pharma-card {
   padding: 11px 13px; border-radius: var(--radius);
@@ -331,9 +331,7 @@ hr { border: none; border-top: 0.5px solid var(--border2); margin: 14px 0; }
       </label>
     </div>
 
-    <div class="nfc-tip">
-      📲 <strong>NFC 使用方式：</strong>將本 App 網址寫入 NFC 貼片，貼在車上。上車掃一下 → 自動開啟並定位最近藥局。
-    </div>
+
 
     <div class="progress-row" id="progress-row">
       <div class="pdot active" id="pd0"></div>
