@@ -1020,6 +1020,17 @@ const KEYWORDS = {
   '下次行動': ['下次','再去','約','帶','跟進','計畫','回訪','待辦','記得','追蹤']
 };
 
+// 不同拜訪目的，該追問的面向不同（例如收款、巡視不一定要聊庫存）
+const TOPICS_BY_VISIT_TYPE = {
+  '送貨': ['客戶反應','庫存與訂單','下次行動'],
+  '巡視': ['客戶反應','產品討論','下次行動'],
+  '收款': ['客戶反應','下次行動'],
+  '新案開發': ['客戶反應','產品討論','下次行動']
+};
+function getRequiredTopics() {
+  return TOPICS_BY_VISIT_TYPE[visitType] || Object.keys(KEYWORDS);
+}
+
 async function sendMsg() {
   const input = document.getElementById('msg-input');
   const text = input.value.trim();
@@ -1040,16 +1051,20 @@ async function sendMsg() {
   document.getElementById('chat-wrap').scrollTop = 99999;
 
   try {
-    const remaining = ['客戶反應','產品討論','庫存與訂單','下次行動'].filter(t => !coveredTopics.has(t));
+    const requiredTopics = getRequiredTopics();
+    const remaining = requiredTopics.filter(t => !coveredTopics.has(t));
     const system = `你是醫藥業務的拜訪紀錄小助手，輕鬆像同事聊天的語氣。
-使用者剛完成「${selectedPharmacy.name}」的拜訪。
+使用者剛完成「${selectedPharmacy.name}」的拜訪，這次拜訪目的是「${visitType}」。
 Key person：${selectedPharmacy.keyMan ? `${selectedPharmacy.title} ${selectedPharmacy.keyMan}` : '（未記錄）'}
 
+這次拜訪目的只需要涵蓋：${requiredTopics.join('、')}
 已提到的面向：${Array.from(coveredTopics).join('、') || '（尚無）'}
 尚未提到：${remaining.join('、') || '✅ 全部完成'}
 
 規則：
+- 只針對「尚未提到」清單裡的面向發問，清單以外的面向（跟這次拜訪目的無關）絕對不要問
 - 每次只問一個問題，針對最重要的尚未涵蓋面向
+- 如果使用者的回覆已經間接表示某面向「沒有、不用聊、不清楚」，就當作該面向已涵蓋，不要換句話重複問
 - 若全部面向都涵蓋了，說「資訊很完整了！可以點下方的「產出紀錄」了。」
 - 語氣自然，不要照本宣科
 - 繁體中文回覆`;
@@ -1059,7 +1074,7 @@ Key person：${selectedPharmacy.keyMan ? `${selectedPharmacy.title} ${selectedPh
     chatHistory.push({ role: 'assistant', content: reply });
     addBubble(reply, 'ai');
     speak(reply);
-    if (chatHistory.length >= 4 || coveredTopics.size >= 2) {
+    if (chatHistory.length >= 4 || coveredTopics.size >= Math.min(2, requiredTopics.length)) {
       document.getElementById('btn-gen').disabled = false;
     }
   } catch(e) {
@@ -1081,20 +1096,25 @@ async function generateNote() {
 
   const system = `你是藥局業務拜訪紀錄助手。根據對話內容，輸出純 JSON 格式，不要任何說明文字或 markdown。
 
+務必逐字擷取對話中提到的具體細節，不可遺漏或簡化，尤其是：
+- 人名／職稱（例如「梁藥師」「梁老闆」），只要對話中出現，即使跟已知 Key Person 不同或未記錄過，都要如實寫進 note 和 summary
+- 提到的數字、品項、日期等具體資訊
+
 JSON 結構如下：
 {
   "note": "完整中店紀錄（包含【客戶反應】【產品討論】【庫存與訂單】【下次拜訪行動】【其他備註】各段落）",
   "summary": "精簡摘要 100字內，包含關鍵人名與重要決策",
   "pain_points": "客戶痛點或抱怨，多個用逗號分隔，若無則填無",
   "action_items": "下次行動項目，條列式",
-  "tags": "從以下選填適合的標籤，逗號分隔：競品, 缺貨, 客訴, 價格, 滿意, 其他"
+  "tags": "從以下選填適合的標籤，逗號分隔：競品, 缺貨, 客訴, 價格, 滿意, 其他",
+  "key_person": "對話中實際提到的關鍵人物姓名與職稱（例如：梁藥師）；若對話沒有提到新的人名，則填入下方已知的 Key Person；都沒有則填空字串"
 }
 
 藥局：${selectedPharmacy.id} ${selectedPharmacy.name}
 地址：${selectedPharmacy.addr}
 日期：${today}
 拜訪目的：${visitType}
-Key Person：${keyPerson}`;
+Key Person（資料庫既有紀錄，僅供參考，以對話中實際提到的為準）：${keyPerson}`;
 
   try {
     const raw = await callGemini(system, chatHistory);
@@ -1103,26 +1123,32 @@ Key Person：${keyPerson}`;
       const clean = raw.replace(/```json|```/g, '').trim();
       parsed = JSON.parse(clean);
     } catch(e) {
-      parsed = { note: raw, summary: '', pain_points: '', action_items: '', tags: '' };
+      parsed = { note: raw, summary: '', pain_points: '', action_items: '', tags: '', key_person: '' };
     }
 
     const pharmacyCode = selectedPharmacy.isNew
       ? `NEW-${selectedPharmacy.name}`
       : selectedPharmacy.id;
 
+    const rawTranscript = chatHistory
+      .filter(m => m.role === 'user')
+      .map(m => m.content)
+      .join('\n');
+
     generatedData = {
       visitId: Math.random().toString(16).slice(2, 10),
       pharmacy: pharmacyCode,
       pharmacyId: pharmacyCode,
       addr: selectedPharmacy.addr,
-      keyMan: selectedPharmacy.keyMan ? `${selectedPharmacy.title} ${selectedPharmacy.keyMan}` : '',
+      keyMan: parsed.key_person || (selectedPharmacy.keyMan ? `${selectedPharmacy.title} ${selectedPharmacy.keyMan}` : ''),
       date: today,
       visitType,
       note: parsed.note || raw,
       summary: parsed.summary || '',
       painPoints: parsed.pain_points || '',
       actionItems: parsed.action_items || '',
-      tags: parsed.tags || ''
+      tags: parsed.tags || '',
+      rawTranscript
     };
 
     document.getElementById('note-content').textContent = generatedData.note;
