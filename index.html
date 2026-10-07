@@ -146,12 +146,15 @@ input:focus, textarea:focus { border-color: var(--text); }
 .visit-type-btn:active { opacity: 0.7; }
 
 .selected-banner {
-  display: none; padding: 10px 14px; border-radius: var(--radius);
+  display: none; flex-direction: column; padding: 10px 14px; border-radius: var(--radius);
   background: var(--green-bg); border: 0.5px solid var(--green);
   color: var(--green); font-size: 13px; font-weight: 500;
-  align-items: center; gap: 8px; margin-bottom: 10px;
+  gap: 4px; margin-bottom: 10px;
 }
 .selected-banner.show { display: flex; }
+.selected-banner .sb-row { display: flex; align-items: center; gap: 8px; }
+.selected-banner .sb-keyman { font-size: 13px; font-weight: 600; }
+.selected-banner .sb-note { font-size: 12px; font-weight: 400; opacity: 0.85; }
 
 /* ── 拜訪前提醒卡片 ── */
 .briefing-card {
@@ -380,9 +383,13 @@ hr { border: none; border-top: 0.5px solid var(--border2); margin: 14px 0; }
 
     <!-- 已選藥局 banner -->
     <div class="selected-banner" id="selected-banner">
-      <span>🏪</span>
-      <span id="sel-name">—</span>
-      <span id="sel-dist" style="margin-left:auto;font-size:11px;font-weight:400;"></span>
+      <div class="sb-row">
+        <span>🏪</span>
+        <span id="sel-name">—</span>
+        <span id="sel-dist" style="margin-left:auto;font-size:11px;font-weight:400;"></span>
+      </div>
+      <div class="sb-keyman" id="sel-keyman" style="display:none"></div>
+      <div class="sb-note" id="sel-note" style="display:none"></div>
     </div>
 
     <!-- ★ 拜訪前提醒卡片 -->
@@ -536,6 +543,7 @@ function parseCSV(text) {
       tel: obj['電話'] || '',
       keyMan: obj['Key Man'] || '',
       title: obj['稱呼'] || '藥師',
+      note: obj['備註'] || '',
       lat, lng
     });
   }
@@ -657,6 +665,22 @@ function selectPharmacy(p) {
   document.getElementById('sel-name').textContent = p.name;
   document.getElementById('sel-dist').textContent = p.dist !== null ? `距離 ${p.dist}m` : '';
   document.getElementById('selected-banner').classList.add('show');
+
+  const keymanEl = document.getElementById('sel-keyman');
+  if (p.keyMan) {
+    keymanEl.textContent = `👤 ${p.title ? p.title + ' ' : ''}${p.keyMan}`;
+    keymanEl.style.display = 'block';
+  } else {
+    keymanEl.style.display = 'none';
+  }
+
+  const noteEl = document.getElementById('sel-note');
+  if (p.note) {
+    noteEl.textContent = `📝 ${p.note}`;
+    noteEl.style.display = 'block';
+  } else {
+    noteEl.style.display = 'none';
+  }
 
   resetRecordForm();
   renderList();
