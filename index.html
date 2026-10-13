@@ -363,21 +363,23 @@ hr { border: none; border-top: 0.5px solid var(--border2); margin: 14px 0; }
     </div>
 
     <div id="temp-visit-form" style="display:none;padding:10px 12px;background:var(--bg2);border-radius:var(--radius-sm);border:0.5px solid var(--border);margin-bottom:10px">
-      <div style="font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.06em;margin-bottom:8px">新案店家資訊（會建立正式客戶檔案）</div>
+      <div style="font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.06em;margin-bottom:8px">新案店家資訊</div>
       <input id="temp-name" placeholder="店名（必填）" style="margin-bottom:6px" />
       <div class="loc-input-row" style="margin-bottom:6px">
         <input id="temp-addr" placeholder="地址（可用下方定位自動填入，再核對門牌）" />
         <button class="btn-sm" onclick="geocodeTempAddress()" id="temp-geo-btn">📍 定位填地址</button>
       </div>
       <input id="temp-tel" placeholder="電話（選填）" style="margin-bottom:6px" />
-      <div style="display:flex;gap:6px;margin-bottom:8px">
+      <div style="display:flex;gap:6px;margin-bottom:10px">
         <input id="temp-keyman-title" placeholder="職稱（如：藥師）" style="flex:1" />
         <input id="temp-keyman-name" placeholder="負責人姓名" style="flex:1" />
       </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn-action" onclick="startTempVisit()" id="temp-submit-btn" style="flex:1;height:36px;font-size:13px;background:var(--text);color:var(--bg);border-color:var(--text)">建檔並開始記錄</button>
-        <button class="btn-action" onclick="hideTempVisit()" style="height:36px;font-size:13px;width:60px">取消</button>
+      <div style="display:flex;gap:8px;margin-bottom:6px">
+        <button class="btn-action" onclick="startTempVisitLight()" style="flex:1;height:36px;font-size:13px">📝 只記這次拜訪</button>
+        <button class="btn-action" onclick="startTempVisit()" id="temp-submit-btn" style="flex:1;height:36px;font-size:13px;background:var(--text);color:var(--bg);border-color:var(--text)">📋 正式建檔</button>
       </div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:8px">只記這次拜訪：不會建立正式客戶，店名/地址/電話/負責人只在這次拜訪暫存，不確定會不會合作時用這個。正式建檔：寫進新客戶資料表、產生正式編號，確定要發展成客戶時用這個</div>
+      <button class="btn-action" onclick="hideTempVisit()" style="height:32px;font-size:12px;width:100%">取消</button>
     </div>
 
     <div class="section-label">附近與客戶清單</div>
@@ -758,6 +760,35 @@ function geocodeTempAddress() {
     showToast('請在瀏覽器允許定位權限');
     btn.disabled = false; btn.textContent = '📍 定位填地址';
   }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+// 只記這次拜訪：不建檔，不產生正式 Customer_ID，比照舊版行為用 NEW-店名 標記
+// 店名/地址/電話/負責人只在這次拜訪暫存（顯示在banner方便您拜訪時參考），不會寫進任何表
+function startTempVisitLight() {
+  const name = document.getElementById('temp-name').value.trim();
+  if (!name) { showToast('請輸入店名'); return; }
+  const addrInput = document.getElementById('temp-addr');
+  const addr = addrInput.value.trim();
+  const tel = document.getElementById('temp-tel').value.trim();
+  const keyManTitle = document.getElementById('temp-keyman-title').value.trim();
+  const keyManName = document.getElementById('temp-keyman-name').value.trim();
+  const lat = parseFloat(addrInput.dataset.lat) || userLat || 0;
+  const lng = parseFloat(addrInput.dataset.lng) || userLng || 0;
+
+  const tempPharmacy = {
+    id: 'NEW', name, addr, tel,
+    title: keyManTitle || '藥師', keyMan: keyManName, note: '',
+    lat, lng, dist: null, isNew: true
+  };
+
+  hideTempVisit();
+  selectPharmacy(tempPharmacy);
+  document.querySelectorAll('#visit-type-row .visit-type-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#visit-type-row .visit-type-btn').forEach(b => {
+    if (b.textContent.includes('新案開發')) { b.classList.add('active'); visitType = '新案開發'; }
+  });
+  switchTab('record');
+  showToast(`📝 開始記錄「${name}」（未建檔）`);
 }
 
 // 建立正式客戶檔案（寫入新客戶資料表_AppSheet，取得真正的 Customer_ID）
