@@ -363,11 +363,19 @@ hr { border: none; border-top: 0.5px solid var(--border2); margin: 14px 0; }
     </div>
 
     <div id="temp-visit-form" style="display:none;padding:10px 12px;background:var(--bg2);border-radius:var(--radius-sm);border:0.5px solid var(--border);margin-bottom:10px">
-      <div style="font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.06em;margin-bottom:8px">新案店家資訊</div>
+      <div style="font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.06em;margin-bottom:8px">新案店家資訊（會建立正式客戶檔案）</div>
       <input id="temp-name" placeholder="店名（必填）" style="margin-bottom:6px" />
-      <input id="temp-addr" placeholder="地址（選填）" style="margin-bottom:8px" />
+      <div class="loc-input-row" style="margin-bottom:6px">
+        <input id="temp-addr" placeholder="地址（可用下方定位自動填入，再核對門牌）" />
+        <button class="btn-sm" onclick="geocodeTempAddress()" id="temp-geo-btn">📍 定位填地址</button>
+      </div>
+      <input id="temp-tel" placeholder="電話（選填）" style="margin-bottom:6px" />
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <input id="temp-keyman-title" placeholder="職稱（如：藥師）" style="flex:1" />
+        <input id="temp-keyman-name" placeholder="負責人姓名" style="flex:1" />
+      </div>
       <div style="display:flex;gap:8px">
-        <button class="btn-action" onclick="startTempVisit()" style="flex:1;height:36px;font-size:13px;background:var(--text);color:var(--bg);border-color:var(--text)">開始記錄</button>
+        <button class="btn-action" onclick="startTempVisit()" id="temp-submit-btn" style="flex:1;height:36px;font-size:13px;background:var(--text);color:var(--bg);border-color:var(--text)">建檔並開始記錄</button>
         <button class="btn-action" onclick="hideTempVisit()" style="height:36px;font-size:13px;width:60px">取消</button>
       </div>
     </div>
@@ -709,26 +717,96 @@ function showTempVisit() {
 function hideTempVisit() {
   document.getElementById('temp-visit-form').style.display = 'none';
   document.getElementById('temp-name').value = '';
-  document.getElementById('temp-addr').value = '';
+  const addrInput = document.getElementById('temp-addr');
+  addrInput.value = '';
+  delete addrInput.dataset.lat;
+  delete addrInput.dataset.lng;
+  document.getElementById('temp-tel').value = '';
+  document.getElementById('temp-keyman-title').value = '';
+  document.getElementById('temp-keyman-name').value = '';
 }
 
-function startTempVisit() {
+// 用目前GPS位置反查地址（OpenStreetMap Nominatim，免費不需金鑰）
+// 只當起點用，門牌號碼要靠使用者對照現場門牌自己核對/修正
+function geocodeTempAddress() {
+  if (!navigator.geolocation) { showToast('瀏覽器不支援定位'); return; }
+  const btn = document.getElementById('temp-geo-btn');
+  btn.disabled = true; btn.textContent = '定位中...';
+
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const { latitude, longitude } = pos.coords;
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&zoom=18&accept-language=zh-TW`);
+      const data = await res.json();
+      const a = data.address || {};
+      // Nominatim 回傳用「臺」，資料庫既有資料用「台」，轉回去保持一致
+      const city = (a.city || a.county || '').replace(/臺/g, '台');
+      const district = (a.suburb || a.town || a.district || '').replace(/臺/g, '台');
+      const road = a.road || '';
+      const houseNum = a.house_number || '';
+      const addrInput = document.getElementById('temp-addr');
+      addrInput.value = `${city}${district}${road}${houseNum}`;
+      addrInput.dataset.lat = latitude;
+      addrInput.dataset.lng = longitude;
+      showToast(houseNum ? '📍 已帶入地址，請核對門牌號碼' : '📍 已帶入路名，門牌請自行補上');
+    } catch (e) {
+      showToast('⚠️ 定位查詢失敗，請手動輸入地址');
+    } finally {
+      btn.disabled = false; btn.textContent = '📍 定位填地址';
+    }
+  }, () => {
+    showToast('請在瀏覽器允許定位權限');
+    btn.disabled = false; btn.textContent = '📍 定位填地址';
+  }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+// 建立正式客戶檔案（寫入新客戶資料表_AppSheet，取得真正的 Customer_ID）
+async function startTempVisit() {
   const name = document.getElementById('temp-name').value.trim();
   if (!name) { showToast('請輸入店名'); return; }
-  const addr = document.getElementById('temp-addr').value.trim();
-  const tempPharmacy = {
-    id: 'NEW', name, addr,
-    lat: userLat || 0, lng: userLng || 0,
-    title: '藥師', keyMan: '', dist: null, isNew: true
-  };
-  hideTempVisit();
-  selectPharmacy(tempPharmacy);
-  document.querySelectorAll('#visit-type-row .visit-type-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('#visit-type-row .visit-type-btn').forEach(b => {
-    if (b.textContent.includes('新案開發')) { b.classList.add('active'); visitType = '新案開發'; }
-  });
-  switchTab('record');
-  showToast(`📋 開始記錄「${name}」`);
+  const addrInput = document.getElementById('temp-addr');
+  const addr = addrInput.value.trim();
+  const tel = document.getElementById('temp-tel').value.trim();
+  const keyManTitle = document.getElementById('temp-keyman-title').value.trim();
+  const keyManName = document.getElementById('temp-keyman-name').value.trim();
+  const lat = parseFloat(addrInput.dataset.lat) || userLat || 0;
+  const lng = parseFloat(addrInput.dataset.lng) || userLng || 0;
+
+  const btn = document.getElementById('temp-submit-btn');
+  btn.disabled = true; btn.textContent = '建檔中...';
+
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'sheets',
+        payload: { action: 'newPharmacy', name, addr, tel, keyManTitle, keyManName, lat, lng }
+      })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || '建檔失敗');
+
+    const newPharmacy = {
+      id: data.customerId, name, addr, tel,
+      title: keyManTitle || '藥師', keyMan: keyManName, note: '',
+      lat, lng, dist: null
+    };
+    pharmacies.push(newPharmacy);
+
+    hideTempVisit();
+    selectPharmacy(newPharmacy);
+    document.querySelectorAll('#visit-type-row .visit-type-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#visit-type-row .visit-type-btn').forEach(b => {
+      if (b.textContent.includes('新案開發')) { b.classList.add('active'); visitType = '新案開發'; }
+    });
+    switchTab('record');
+    showToast(`✅ 已建立客戶 ${data.customerId}「${name}」`);
+  } catch (e) {
+    showToast('⚠️ 建檔失敗：' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '建檔並開始記錄';
+  }
 }
 
 // ========== 拜訪前提醒 ==========
