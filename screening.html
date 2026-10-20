@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>新開藥局篩選</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one narrow column of review cards under a sticky header with counts and filters — built for thumb use on a phone between visits. */
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --fg:#17201d; --muted:#5d6b66; --line:#dce3e0;
+  --accent:#0f6b52; --accent-weak:#e2f1ec; --go:#0f6b52; --later:#9a6408; --later-weak:#fbf0dc;
+  --no:#8a3b3b; --no-weak:#f6e5e5; --flag:#7a5a00; --flag-weak:#fff4cc;
+  --f-body:"Noto Sans TC",-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111715; --surface:#19211e; --fg:#e6ece9; --muted:#97a6a0; --line:#2a3531;
+  --accent:#5cc6a2; --accent-weak:#16352b; --go:#5cc6a2; --later:#e5b25a; --later-weak:#3a2d14;
+  --no:#e08b8b; --no-weak:#3a1f1f; --flag:#e8c75a; --flag-weak:#352d10; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111715; --surface:#19211e; --fg:#e6ece9; --muted:#97a6a0; --line:#2a3531;
+  --accent:#5cc6a2; --accent-weak:#16352b; --go:#5cc6a2; --later:#e5b25a; --later-weak:#3a2d14;
+  --no:#e08b8b; --no-weak:#3a1f1f; --flag:#e8c75a; --flag-weak:#352d10; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.55}
+.wrap{max-width:720px;margin:0 auto;padding-inline:16px;padding-block:0 48px}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:14px 10px;border-bottom:1px solid var(--line)}
+h1{font-size:20px;margin:0;font-weight:700;letter-spacing:.02em}
+.sub{color:var(--muted);font-size:13px;margin:2px 0 10px}
+.tabs,.cities{display:flex;flex-wrap:wrap;gap:6px}
+.cities{margin-top:8px}
+.tab,.city{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:999px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer}
+.tab b{font-family:var(--f-mono);font-weight:500;margin-left:4px}
+.tab[aria-pressed="true"],.city[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.tab:focus-visible,.city:focus-visible,button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#list{display:grid;gap:12px;margin-top:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:10px;min-width:0}
+.card[data-d="go"]{border-left:4px solid var(--go)}
+.card[data-d="later"]{border-left:4px solid var(--later)}
+.card[data-d="no"]{border-left:4px solid var(--no);opacity:.75}
+.top{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.name{font-size:17px;font-weight:700;margin:0}
+.dist{font-size:12px;color:var(--accent);background:var(--accent-weak);border-radius:4px;padding:1px 6px}
+.seen{margin-left:auto;font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.addr{display:flex;gap:8px;align-items:center;min-width:0}
+.addr span{user-select:text;overflow-wrap:anywhere;min-width:0}
+.mini{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:6px;font:inherit;font-size:12px;padding:2px 8px;cursor:pointer;flex:none}
+.meta{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.meta .m{font-family:var(--f-mono)}
+.flags{display:flex;flex-wrap:wrap;gap:6px}
+.flag{font-size:12px;background:var(--flag-weak);color:var(--flag);border-radius:4px;padding:2px 8px}
+.links{display:flex;gap:8px;flex-wrap:wrap}
+.links a{font-size:13px;color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:6px;padding:5px 10px}
+.checks{display:flex;gap:8px;flex-wrap:wrap}
+.chk{display:inline-flex;gap:6px;align-items:center;font-size:13px;border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer}
+.chk input{accent-color:var(--accent);margin:0}
+.decide{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.decide button{font:inherit;font-size:14px;font-weight:500;padding:9px 0;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.decide button[data-v="go"][aria-pressed="true"]{background:var(--go);border-color:var(--go);color:var(--surface)}
+.decide button[data-v="later"][aria-pressed="true"]{background:var(--later-weak);border-color:var(--later);color:var(--later)}
+.decide button[data-v="no"][aria-pressed="true"]{background:var(--no-weak);border-color:var(--no);color:var(--no)}
+.note{width:100%;font:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+.empty{color:var(--muted);text-align:center;padding:40px 12px;border:1px dashed var(--line);border-radius:10px}
+.status{font-size:12px;color:var(--muted);min-height:1em;margin-top:6px}
+@media (prefers-reduced-motion:no-preference){.card{transition:opacity .2s}}
+#cfg{margin-top:8px;font-size:13px}#cfg label{display:block;margin-top:6px}#cfg .mini{margin-top:6px}
+body{margin:0}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>新開藥局篩選</h1>
+    <p class="sub">來源：藥局每日異動追蹤（新竹以北、核准設立）＋財政部稅籍新記錄。同地址已合併。</p>
+    <div class="tabs" id="tabs" role="group" aria-label="狀態">
+      <button class="tab" data-f="todo" aria-pressed="true">待篩<b id="n-todo">0</b></button>
+      <button class="tab" data-f="go" aria-pressed="false">要去<b id="n-go">0</b></button>
+      <button class="tab" data-f="later" aria-pressed="false">再查<b id="n-later">0</b></button>
+      <button class="tab" data-f="no" aria-pressed="false">不去<b id="n-no">0</b></button>
+      <button class="tab" data-f="all" aria-pressed="false">全部<b id="n-all">0</b></button>
+    </div>
+    <div class="cities" id="cities" role="group" aria-label="縣市"></div>
+    <div class="status" id="status">載入中…</div>
+    <details id="cfg"><summary>連線設定</summary>
+      <label>Apps Script 網址 <input id="cfg-url" class="note" placeholder="https://script.google.com/macros/s/…/exec"></label>
+      <label>密碼 <input id="cfg-token" class="note" placeholder="setup() 產生的密碼"></label>
+      <button class="mini" id="cfg-save">儲存並重新載入</button>
+    </details>
+  </header>
+  <main id="list"><div class="empty">正在讀取名單。每天早上 8 點 Apps Script 會把新店加進來。</div></main>
+</div>
+
+<script>
+(function(){
+  // ===== 連線設定（存在這台裝置的瀏覽器）=====
+  const LS={get(k){try{return localStorage.getItem(k)||""}catch(e){return ""}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+  const DEFAULT_URL="https://script.google.com/macros/s/AKfycbyUJrKP1PsAOsQx8sVnJE5dwMhsn7LdEdZctsP_Y_T8em7AM5BtubDDpR1eL-1ZLxUNuQ/exec"; // 部署後可直接把 /exec 網址填在這裡，就不用每台裝置輸入
+  const API={url:LS.get("nps_url")||DEFAULT_URL,token:LS.get("nps_token")};
+  const S={rows:[],f:"todo",city:"全部"};
+  const DEC={"要去":"go","再查":"later","不去":"no"}, DEC_R={go:"要去",later:"再查",no:"不去"};
+  const $=s=>document.querySelector(s);
+  const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const md=s=>s?s.slice(5).replace("-","/"):"";
+  const maps=q=>"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(q);
+  const gsearch=q=>"https://www.google.com/search?q="+encodeURIComponent(q);
+  const mapAddr=a=>{let s=String(a||"").replace(/(區|鄉|鎮|市)([^區鄉鎮市路街道巷]{1,4}里)(?=\S*[路街道])/,"$1");const i=s.indexOf("號");return i>0?s.slice(0,i+1):s};
+  const split=(s,sep)=>s?String(s).split(sep).filter(Boolean):[];
+  const bucket=r=>DEC[r.decision]||"todo";
+
+  function renderCities(){
+    const list=["全部",...new Set(S.rows.map(c=>c.city))];
+    $("#cities").innerHTML=list.map(c=>`<button class="city" data-c="${esc(c)}" aria-pressed="${c===S.city}">${esc(c.replace("市","").replace("縣",""))}</button>`).join("");
+  }
+  function render(){
+    const inCity=S.rows.filter(c=>S.city==="全部"||c.city===S.city);
+    const counts={todo:0,go:0,later:0,no:0,all:inCity.length};
+    inCity.forEach(c=>counts[bucket(c)]++);
+    for(const k in counts) $("#n-"+k).textContent=counts[k];
+    const rows=inCity.filter(c=>S.f==="all"||bucket(c)===S.f).sort((a,b)=>(b.firstSeen||"").localeCompare(a.firstSeen||""));
+    if(!S.rows.length){$("#list").innerHTML='<div class="empty">目前沒有名單。確認上方「連線設定」已填好 Apps Script 網址和密碼。</div>';return}
+    if(!rows.length){$("#list").innerHTML='<div class="empty">這個分類目前沒有店家。</div>';return}
+    $("#list").innerHTML=rows.map(c=>{
+      const d=bucket(c), flags=split(c.flags,"；"), sch=split(c.scheduled,"、");
+      return `<article class="card" data-id="${esc(c.id)}" data-d="${d}">
+        <div class="top"><h2 class="name">${esc(c.name)}</h2><span class="dist">${esc(c.city.replace("市","").replace("縣",""))}${esc(c.district)}</span><span class="seen">首次出現 ${md(c.firstSeen)}</span></div>
+        <div class="addr"><span>${esc(c.address)}</span><button class="mini" data-act="copy">複製</button></div>
+        <div class="meta">設立 <span class="m">${esc(c.setup)}</span> · 統編 <span class="m">${esc(c.taxIds)}</span> · ${esc(c.sources)}</div>
+        ${sch.length?`<div class="flags">${sch.map(s=>`<span class="dist">已排 ${esc(md(s))}</span>`).join("")}</div>`:""}
+        ${flags.length?`<div class="flags">${flags.map(f=>`<span class="flag">${esc(f)}</span>`).join("")}</div>`:""}
+        <div class="links"><a href="${gsearch(c.name)}" target="_blank" rel="noopener">Google 搜尋</a><a href="${maps(mapAddr(c.address))}" target="_blank" rel="noopener">開地圖</a><a href="${maps("診所 "+mapAddr(c.address))}" target="_blank" rel="noopener">附近診所</a></div>
+        <div class="checks">
+          <label class="chk"><input type="checkbox" data-act="front" ${c.front?"checked":""}>門前藥局</label>
+          <label class="chk"><input type="checkbox" data-act="chain" ${c.chain?"checked":""}>連鎖藥局</label>
+          <label class="chk"><input type="checkbox" data-act="wrong" ${c.wrong?"checked":""}>名單有誤／查無此店</label>
+        </div>
+        <div class="decide" role="group" aria-label="決定">
+          <button data-act="dec" data-v="go" aria-pressed="${d==="go"}">要去</button>
+          <button data-act="dec" data-v="later" aria-pressed="${d==="later"}">再查</button>
+          <button data-act="dec" data-v="no" aria-pressed="${d==="no"}">不去</button>
+        </div>
+        <input class="note" data-act="note" placeholder="備註（例如：對面是耳鼻喉科、老藥師）" value="${esc(c.note||"")}">
+      </article>`}).join("");
+  }
+
+  async function load(){
+    if(!API.url||!API.token){$("#status").textContent="請先填寫連線設定。";$("#cfg").open=true;render();return}
+    $("#status").textContent="載入中…";
+    try{
+      const r=await fetch(API.url+"?token="+encodeURIComponent(API.token));
+      const j=await r.json();
+      if(j.error){$("#status").textContent=j.error==="bad_token"?"密碼不對，請檢查連線設定。":"讀取失敗："+j.error;$("#cfg").open=true;return}
+      S.rows=j.rows||[];$("#status").textContent="共 "+S.rows.length+" 家";renderCities();render();
+    }catch(e){$("#status").textContent="連不到 Apps Script，請檢查網址或網路。"}
+  }
+  let queue=Promise.resolve();
+  function save(id,patch){
+    const row=S.rows.find(r=>r.id===id); if(!row) return;
+    Object.assign(row,patch); render();
+    $("#status").textContent="儲存中…";
+    queue=queue.then(()=>fetch(API.url,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({token:API.token,id,patch})})
+      .then(r=>r.json()).then(j=>{$("#status").textContent=j.ok?"已儲存":"儲存失敗："+(j.error||"未知")})
+      .catch(()=>{$("#status").textContent="儲存失敗：連不到 Apps Script，請重新整理後再試。"}));
+  }
+
+  document.addEventListener("click",e=>{
+    if(e.target.id==="cfg-save"){LS.set("nps_url",$("#cfg-url").value.trim());LS.set("nps_token",$("#cfg-token").value.trim());API.url=$("#cfg-url").value.trim();API.token=$("#cfg-token").value.trim();load();return}
+    const t=e.target.closest("[data-f],[data-c],[data-act]"); if(!t) return;
+    if(t.dataset.f){S.f=t.dataset.f;document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-pressed",b===t));render();return}
+    if(t.dataset.c){S.city=t.dataset.c;renderCities();render();return}
+    const card=t.closest(".card"); if(!card) return; const id=card.dataset.id; const row=S.rows.find(r=>r.id===id);
+    if(t.dataset.act==="dec"){const v=DEC_R[t.dataset.v];save(id,{decision:row.decision===v?"":v})}
+    if(t.dataset.act==="copy"){const a=card.querySelector(".addr span").textContent;
+      navigator.clipboard?.writeText(a).then(()=>{t.textContent="已複製"},()=>{const r=document.createRange();r.selectNodeContents(card.querySelector(".addr span"));const s=getSelection();s.removeAllRanges();s.addRange(r)})}
+  });
+  document.addEventListener("change",e=>{
+    const t=e.target, card=t.closest&&t.closest(".card"); if(!card) return; const id=card.dataset.id; const row=S.rows.find(r=>r.id===id);
+    if(["front","chain","wrong"].includes(t.dataset.act)) save(id,{[t.dataset.act]:t.checked});
+    if(t.dataset.act==="note" && t.value!==(row.note||"")) save(id,{note:t.value});
+  });
+  $("#cfg-url").value=API.url; $("#cfg-token").value=API.token;
+  load();
+})();
+</script>
+</body>
+</html>
