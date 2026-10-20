@@ -65,15 +65,28 @@ h1{font-size:20px;margin:0;font-weight:700;letter-spacing:.02em}
 .empty{color:var(--muted);text-align:center;padding:40px 12px;border:1px dashed var(--line);border-radius:10px}
 .status{font-size:12px;color:var(--muted);min-height:1em;margin-top:6px}
 @media (prefers-reduced-motion:no-preference){.card{transition:opacity .2s}}
-#cfg{margin-top:8px;font-size:13px}#cfg label{display:block;margin-top:6px}#cfg .mini{margin-top:6px}
 body{margin:0}
+.top-row{display:flex;align-items:center;gap:8px}
+.top-row h1{flex:1}
+.icon-btn{border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:8px;width:32px;height:32px;font-size:15px;line-height:1;cursor:pointer;flex:none}
+.icon-btn:hover{color:var(--fg)}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+.modal-backdrop.show{display:flex}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;width:100%;max-width:360px;font-size:13px}
+.modal-head{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.modal-head h2{font-size:15px;margin:0;flex:1}
+.modal label{display:block;margin-top:10px}
+.modal .mini{margin-top:12px}
 </style>
 </head>
 <body>
 
 <div class="wrap">
   <header>
-    <h1>新開藥局篩選</h1>
+    <div class="top-row">
+      <h1>新開藥局篩選</h1>
+      <button class="icon-btn" id="cfg-open" aria-label="連線設定" title="連線設定">⚙</button>
+    </div>
     <p class="sub">來源：藥局每日異動追蹤（新竹以北、核准設立）＋財政部稅籍新記錄。同地址已合併。</p>
     <div class="tabs" id="tabs" role="group" aria-label="狀態">
       <button class="tab" data-f="todo" aria-pressed="true">待篩<b id="n-todo">0</b></button>
@@ -84,13 +97,17 @@ body{margin:0}
     </div>
     <div class="cities" id="cities" role="group" aria-label="縣市"></div>
     <div class="status" id="status">載入中…</div>
-    <details id="cfg"><summary>連線設定</summary>
-      <label>Apps Script 網址 <input id="cfg-url" class="note" placeholder="https://script.google.com/macros/s/…/exec"></label>
-      <label>密碼 <input id="cfg-token" class="note" placeholder="setup() 產生的密碼"></label>
-      <button class="mini" id="cfg-save">儲存並重新載入</button>
-    </details>
   </header>
   <main id="list"><div class="empty">正在讀取名單。每天早上 8 點 Apps Script 會把新店加進來。</div></main>
+</div>
+
+<div class="modal-backdrop" id="cfg-backdrop">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cfg-title">
+    <div class="modal-head"><h2 id="cfg-title">連線設定</h2><button class="icon-btn" id="cfg-close" aria-label="關閉">✕</button></div>
+    <label>Apps Script 網址 <input id="cfg-url" class="note" placeholder="https://script.google.com/macros/s/…/exec"></label>
+    <label>密碼 <input id="cfg-token" class="note" placeholder="setup() 產生的密碼"></label>
+    <button class="mini" id="cfg-save">儲存並重新載入</button>
+  </div>
 </div>
 
 <script>
@@ -120,7 +137,7 @@ body{margin:0}
     inCity.forEach(c=>counts[bucket(c)]++);
     for(const k in counts) $("#n-"+k).textContent=counts[k];
     const rows=inCity.filter(c=>S.f==="all"||bucket(c)===S.f).sort((a,b)=>(b.firstSeen||"").localeCompare(a.firstSeen||""));
-    if(!S.rows.length){$("#list").innerHTML='<div class="empty">目前沒有名單。確認上方「連線設定」已填好 Apps Script 網址和密碼。</div>';return}
+    if(!S.rows.length){$("#list").innerHTML='<div class="empty">目前沒有名單。確認右上角齒輪「連線設定」已填好 Apps Script 網址和密碼。</div>';return}
     if(!rows.length){$("#list").innerHTML='<div class="empty">這個分類目前沒有店家。</div>';return}
     $("#list").innerHTML=rows.map(c=>{
       const d=bucket(c), flags=split(c.flags,"；"), sch=split(c.scheduled,"、");
@@ -145,13 +162,16 @@ body{margin:0}
       </article>`}).join("");
   }
 
+  function openCfg(){$("#cfg-backdrop").classList.add("show")}
+  function closeCfg(){$("#cfg-backdrop").classList.remove("show")}
+
   async function load(){
-    if(!API.url||!API.token){$("#status").textContent="請先填寫連線設定。";$("#cfg").open=true;render();return}
+    if(!API.url||!API.token){$("#status").textContent="請先填寫連線設定。";openCfg();render();return}
     $("#status").textContent="載入中…";
     try{
       const r=await fetch(API.url+"?token="+encodeURIComponent(API.token));
       const j=await r.json();
-      if(j.error){$("#status").textContent=j.error==="bad_token"?"密碼不對，請檢查連線設定。":"讀取失敗："+j.error;$("#cfg").open=true;return}
+      if(j.error){$("#status").textContent=j.error==="bad_token"?"密碼不對，請檢查連線設定。":"讀取失敗："+j.error;openCfg();return}
       S.rows=j.rows||[];$("#status").textContent="共 "+S.rows.length+" 家";renderCities();render();
     }catch(e){$("#status").textContent="連不到 Apps Script，請檢查網址或網路。"}
   }
@@ -166,7 +186,9 @@ body{margin:0}
   }
 
   document.addEventListener("click",e=>{
-    if(e.target.id==="cfg-save"){LS.set("nps_url",$("#cfg-url").value.trim());LS.set("nps_token",$("#cfg-token").value.trim());API.url=$("#cfg-url").value.trim();API.token=$("#cfg-token").value.trim();load();return}
+    if(e.target.id==="cfg-open"){openCfg();return}
+    if(e.target.id==="cfg-close"||e.target.id==="cfg-backdrop"){closeCfg();return}
+    if(e.target.id==="cfg-save"){LS.set("nps_url",$("#cfg-url").value.trim());LS.set("nps_token",$("#cfg-token").value.trim());API.url=$("#cfg-url").value.trim();API.token=$("#cfg-token").value.trim();closeCfg();load();return}
     const t=e.target.closest("[data-f],[data-c],[data-act]"); if(!t) return;
     if(t.dataset.f){S.f=t.dataset.f;document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-pressed",b===t));render();return}
     if(t.dataset.c){S.city=t.dataset.c;renderCities();render();return}
