@@ -81,14 +81,14 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); min-
 .section-label:first-child { margin-top: 0; }
 
 /* Input */
-input, textarea {
+input, textarea, select {
   width: 100%; padding: 10px 12px; font-size: 14px;
   background: var(--bg2); border: 0.5px solid var(--border2);
   border-radius: var(--radius-sm); color: var(--text);
   font-family: var(--font); outline: none;
   transition: border-color 0.2s;
 }
-input:focus, textarea:focus { border-color: var(--text); }
+input:focus, textarea:focus, select:focus { border-color: var(--text); }
 
 /* GPS row */
 .gps-row {
@@ -370,15 +370,26 @@ hr { border: none; border-top: 0.5px solid var(--border2); margin: 14px 0; }
         <button class="btn-sm" onclick="geocodeTempAddress()" id="temp-geo-btn">📍 定位填地址</button>
       </div>
       <input id="temp-tel" placeholder="電話（選填）" style="margin-bottom:6px" />
-      <div style="display:flex;gap:6px;margin-bottom:10px">
-        <input id="temp-keyman-title" placeholder="職稱（如：藥師）" style="flex:1" />
-        <input id="temp-keyman-name" placeholder="負責人姓名" style="flex:1" />
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <select id="temp-keyman-title" style="flex:1">
+          <option value="">職稱（選填）</option>
+          <option value="藥師">藥師</option>
+          <option value="老闆">老闆</option>
+          <option value="採購">採購</option>
+        </select>
+        <input id="temp-keyman-name" placeholder="稱呼" style="flex:1" />
+      </div>
+      <div id="temp-owner-row" style="margin-bottom:10px">
+        <select id="temp-owner">
+          <option value="我">負責人：我</option>
+          <option value="老爸">負責人：老爸</option>
+        </select>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:6px">
         <button class="btn-action" onclick="startTempVisitLight()" style="flex:1;height:36px;font-size:13px">📝 只記這次拜訪</button>
         <button class="btn-action" onclick="startTempVisit()" id="temp-submit-btn" style="flex:1;height:36px;font-size:13px;background:var(--text);color:var(--bg);border-color:var(--text)">📋 正式建檔</button>
       </div>
-      <div style="font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:8px">只記這次拜訪：不會建立正式客戶，店名/地址/電話/負責人只在這次拜訪暫存，不確定會不會合作時用這個。正式建檔：寫進新客戶資料表、產生正式編號，確定要發展成客戶時用這個</div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:8px">只記這次拜訪：不會建立正式客戶，店名/地址/電話/稱呼只在這次拜訪暫存，不確定會不會合作時用這個（負責人欄只在正式建檔才會用到）。正式建檔：寫進新客戶資料表、產生正式編號，確定要發展成客戶時用這個</div>
       <button class="btn-action" onclick="hideTempVisit()" style="height:32px;font-size:12px;width:100%">取消</button>
     </div>
 
@@ -726,6 +737,7 @@ function hideTempVisit() {
   document.getElementById('temp-tel').value = '';
   document.getElementById('temp-keyman-title').value = '';
   document.getElementById('temp-keyman-name').value = '';
+  document.getElementById('temp-owner').value = '我';
 }
 
 // 用目前GPS位置反查地址（OpenStreetMap Nominatim，免費不需金鑰）
@@ -800,6 +812,7 @@ async function startTempVisit() {
   const tel = document.getElementById('temp-tel').value.trim();
   const keyManTitle = document.getElementById('temp-keyman-title').value.trim();
   const keyManName = document.getElementById('temp-keyman-name').value.trim();
+  const owner = document.getElementById('temp-owner').value;
   const lat = parseFloat(addrInput.dataset.lat) || userLat || 0;
   const lng = parseFloat(addrInput.dataset.lng) || userLng || 0;
 
@@ -812,7 +825,7 @@ async function startTempVisit() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         type: 'sheets',
-        payload: { action: 'newPharmacy', name, addr, tel, keyManTitle, keyManName, lat, lng }
+        payload: { action: 'newPharmacy', name, addr, tel, keyManTitle, keyManName, owner, lat, lng }
       })
     });
     const data = await res.json();
