@@ -389,7 +389,7 @@ hr { border: none; border-top: 0.5px solid var(--border2); margin: 14px 0; }
         <button class="btn-action" onclick="startTempVisitLight()" style="flex:1;height:36px;font-size:13px">📝 只記這次拜訪</button>
         <button class="btn-action" onclick="startTempVisit()" id="temp-submit-btn" style="flex:1;height:36px;font-size:13px;background:var(--text);color:var(--bg);border-color:var(--text)">📋 正式建檔</button>
       </div>
-      <div style="font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:8px">只記這次拜訪：不會建立正式客戶，店名/地址/電話/稱呼只在這次拜訪暫存，不確定會不會合作時用這個（負責人欄只在正式建檔才會用到）。正式建檔：寫進新客戶資料表、產生正式編號，確定要發展成客戶時用這個</div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:8px">只記這次拜訪：不會建立正式客戶，但店名/地址/電話/稱呼會存進「未建檔店家」清單，下次拜訪同一家店可以直接從清單點選，不用重新輸入，不確定會不會合作時用這個（負責人欄只在正式建檔才會用到）。正式建檔：寫進新客戶資料表、產生正式編號，確定要發展成客戶時用這個</div>
       <button class="btn-action" onclick="hideTempVisit()" style="height:32px;font-size:12px;width:100%">取消</button>
     </div>
 
@@ -507,6 +507,7 @@ const SHEETS_WEBHOOK = 'https://script.google.com/macros/s/AKfycbxBDS60OKaAhxeS5
 
 // ========== 狀態 ==========
 let pharmacies = [];
+let tempPharmacies = [];
 let userLat = null, userLng = null;
 let selectedPharmacy = null;
 let visitType = '送貨';
@@ -522,7 +523,45 @@ async function init() {
   pharmacies = BUILTIN_PHARMACIES;
   renderList();
   fetchFromSheets().catch(() => {});
+  fetchTempPharmacies().catch(() => {});
   locateMe();
+}
+
+// 「未建檔店家」暫存清單：地址/電話/職稱/稱呼存過一次之後，再拜訪同一家店可以直接從清單點選，
+// 不用重新輸入（跟正式客戶走同一份 pharmacies 清單 render，所以只要 shape 對齊即可）
+async function fetchTempPharmacies() {
+  const res = await fetch(WORKER_URL.replace(/\/$/, '') + '/temp-pharmacies');
+  const text = await res.text();
+  tempPharmacies = parseTempCSV(text);
+  renderList();
+}
+
+function parseTempCSV(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return [];
+  const headers = parseCSVLine(lines[0]);
+  const result = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const vals = parseCSVLine(lines[i]);
+    const obj = {};
+    headers.forEach((h, idx) => obj[h.trim()] = (vals[idx] || '').trim());
+    if (obj['已轉正']) continue; // 已經正式建檔的，主清單用正式客戶那筆就好
+    const lat = parseFloat(obj['緯度']);
+    const lng = parseFloat(obj['經度']);
+    if (!obj['id'] || !obj['店名'] || isNaN(lat) || isNaN(lng)) continue;
+    result.push({
+      id: obj['id'],
+      name: obj['店名'],
+      addr: obj['地址'] || '',
+      tel: obj['電話'] || '',
+      title: obj['職稱'] || '藥師',
+      keyMan: obj['稱呼'] || '',
+      note: '',
+      lat, lng, isNew: true
+    });
+  }
+  return result;
 }
 
 async function fetchFromSheets() {
@@ -634,9 +673,10 @@ function haversine(lat1, lng1, lat2, lng2) {
 // ========== 藥局清單 ==========
 function renderList() {
   const list = document.getElementById('pharma-list');
-  if (!pharmacies.length) { list.innerHTML = '<div class="spinner">無資料</div>'; return; }
+  const all = [...pharmacies, ...tempPharmacies];
+  if (!all.length) { list.innerHTML = '<div class="spinner">無資料</div>'; return; }
 
-  const data = pharmacies.map(p => ({
+  const data = all.map(p => ({
     ...p,
     dist: userLat !== null ? Math.round(haversine(userLat, userLng, p.lat, p.lng)) : null
   })).sort((a, b) => (a.dist ?? 999999) - (b.dist ?? 999999));
@@ -650,10 +690,11 @@ function renderList() {
       ? `<div class="pc-dist ${p.dist > 100 ? 'far' : ''}">${p.dist < 1000 ? p.dist + 'm' : (p.dist/1000).toFixed(1) + 'km'}</div>`
       : '';
     const keyInfo = p.keyMan ? `${p.title} ${p.keyMan}` : p.title;
+    const tempBadge = p.isNew ? '未建檔・' : '';
     div.innerHTML = `
       <div class="pc-info">
         <div class="pc-name">${p.name}</div>
-        <div class="pc-sub">${p.addr || keyInfo}</div>
+        <div class="pc-sub">${tempBadge}${p.addr || keyInfo}</div>
       </div>
       ${distHtml}`;
     div.onclick = () => selectPharmacy({...p, dist: p.dist});
@@ -662,8 +703,9 @@ function renderList() {
 }
 
 function autoSelectNearest() {
-  if (!userLat || !pharmacies.length) return;
-  const nearest = pharmacies.map(p => ({
+  const all = [...pharmacies, ...tempPharmacies];
+  if (!userLat || !all.length) return;
+  const nearest = all.map(p => ({
     ...p, dist: Math.round(haversine(userLat, userLng, p.lat, p.lng))
   })).sort((a,b) => a.dist - b.dist)[0];
   if (nearest) {
@@ -774,9 +816,9 @@ function geocodeTempAddress() {
   }, { enableHighAccuracy: true, timeout: 10000 });
 }
 
-// 只記這次拜訪：不建檔，不產生正式 Customer_ID，比照舊版行為用 NEW-店名 標記
-// 店名/地址/電話/負責人只在這次拜訪暫存（顯示在banner方便您拜訪時參考），不會寫進任何表
-function startTempVisitLight() {
+// 只記這次拜訪：不建立正式客戶、不產生 Customer_ID，但店名/地址/電話/職稱/稱呼會存進
+// 「未建檔店家」暫存清單（寫入 upsertTempPharmacy），下次拜訪同一家店可以直接從清單點選，不用重新輸入
+async function startTempVisitLight() {
   const name = document.getElementById('temp-name').value.trim();
   if (!name) { showToast('請輸入店名'); return; }
   const addrInput = document.getElementById('temp-addr');
@@ -788,7 +830,7 @@ function startTempVisitLight() {
   const lng = parseFloat(addrInput.dataset.lng) || userLng || 0;
 
   const tempPharmacy = {
-    id: 'NEW', name, addr, tel,
+    id: 'NEW-' + name, name, addr, tel,
     title: keyManTitle || '藥師', keyMan: keyManName, note: '',
     lat, lng, dist: null, isNew: true
   };
@@ -801,6 +843,30 @@ function startTempVisitLight() {
   });
   switchTab('record');
   showToast(`📝 開始記錄「${name}」（未建檔）`);
+
+  // 背景同步到暫存清單，拿到穩定 id 後補到 selectedPharmacy 跟清單，失敗也不影響這次拜訪記錄本身
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'sheets',
+        payload: { action: 'upsertTempPharmacy', name, addr, tel, keyManTitle, keyManName, lat, lng }
+      })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || '暫存失敗');
+
+    tempPharmacy.id = data.id;
+    tempPharmacies = tempPharmacies.filter(p => p.id !== data.id);
+    tempPharmacies.push({ ...tempPharmacy });
+    if (selectedPharmacy && selectedPharmacy.name === name && selectedPharmacy.isNew) {
+      selectedPharmacy.id = data.id;
+    }
+    renderList();
+  } catch (e) {
+    console.error('upsertTempPharmacy failed', e);
+  }
 }
 
 // 建立正式客戶檔案（寫入新客戶資料表_AppSheet，取得真正的 Customer_ID）
@@ -837,6 +903,8 @@ async function startTempVisit() {
       lat, lng, dist: null
     };
     pharmacies.push(newPharmacy);
+    // 後端已經把「未建檔店家」對應列標記已轉正，這裡順手濾掉本地那一筆，避免清單短暫重複
+    tempPharmacies = tempPharmacies.filter(p => p.addr !== addr || !addr);
 
     hideTempVisit();
     selectPharmacy(newPharmacy);
@@ -879,12 +947,6 @@ async function loadVisitBriefing(pharmacy) {
   const content = document.getElementById('briefing-content');
   const toggle = document.getElementById('briefing-toggle');
   const header = document.getElementById('briefing-header');
-
-  // 新案開發沒有歷史
-  if (pharmacy.isNew) {
-    card.classList.remove('show');
-    return;
-  }
 
   // 重置 UI
   card.classList.add('show');
@@ -1096,7 +1158,8 @@ async function saveToSheets() {
   const tags = Array.from(document.querySelectorAll('.tag-chip.active')).map(b => b.textContent.trim()).join(',');
 
   const today = new Date().toLocaleDateString('zh-TW');
-  const pharmacyCode = selectedPharmacy.isNew ? `NEW-${selectedPharmacy.name}` : selectedPharmacy.id;
+  // 未建檔店家現在有「未建檔店家」暫存清單給的穩定 id，直接用它；id 還沒同步回來時退回 NEW-店名 當保底
+  const pharmacyCode = selectedPharmacy.id || `NEW-${selectedPharmacy.name}`;
 
   const generatedData = {
     visitId: Math.random().toString(16).slice(2, 10),
