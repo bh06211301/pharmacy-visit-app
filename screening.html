@@ -92,13 +92,18 @@ body{margin:0}
       <h1>新開藥局篩選</h1>
       <button class="icon-btn" id="cfg-open" aria-label="連線設定" title="連線設定">⚙</button>
     </div>
-    <p class="sub">來源：藥局每日異動追蹤（新竹以北、核准設立）＋財政部稅籍新記錄。同地址已合併。</p>
+    <p class="sub">來源：藥局每日異動追蹤（新竹以北、核准設立）＋財政部稅籍新記錄，以及既有客戶換負責人。同地址已合併。</p>
     <div class="tabs" id="tabs" role="group" aria-label="狀態">
       <button class="tab" data-f="todo" aria-pressed="true">待篩<b id="n-todo">0</b></button>
       <button class="tab" data-f="go" aria-pressed="false">要去<b id="n-go">0</b></button>
       <button class="tab" data-f="later" aria-pressed="false">再查<b id="n-later">0</b></button>
       <button class="tab" data-f="no" aria-pressed="false">不去<b id="n-no">0</b></button>
       <button class="tab" data-f="all" aria-pressed="false">全部<b id="n-all">0</b></button>
+    </div>
+    <div class="cities" id="types" role="group" aria-label="類型">
+      <button class="city" data-t="全部" aria-pressed="true">全部類型</button>
+      <button class="city" data-t="新開發" aria-pressed="false">新開發</button>
+      <button class="city" data-t="客戶異動" aria-pressed="false">客戶異動</button>
     </div>
     <div class="cities" id="cities" role="group" aria-label="縣市"></div>
     <div class="status" id="status">載入中…</div>
@@ -121,8 +126,9 @@ body{margin:0}
   const LS={get(k){try{return localStorage.getItem(k)||""}catch(e){return ""}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
   const DEFAULT_URL="https://script.google.com/macros/s/AKfycbyUJrKP1PsAOsQx8sVnJE5dwMhsn7LdEdZctsP_Y_T8em7AM5BtubDDpR1eL-1ZLxUNuQ/exec"; // 部署後可直接把 /exec 網址填在這裡，就不用每台裝置輸入
   const API={url:LS.get("nps_url")||DEFAULT_URL,token:LS.get("nps_token")};
-  const S={rows:[],f:"todo",city:"全部"};
+  const S={rows:[],f:"todo",city:"全部",type:"全部"};
   const DEC={"要去":"go","再查":"later","不去":"no"}, DEC_R={go:"要去",later:"再查",no:"不去"};
+  const isOwnerChange=c=>String(c.sources||"").indexOf("負責人異動")>=0;
   const $=s=>document.querySelector(s);
   const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
   const md=s=>s?s.slice(5).replace("-","/"):"";
@@ -137,11 +143,11 @@ body{margin:0}
     $("#cities").innerHTML=list.map(c=>`<button class="city" data-c="${esc(c)}" aria-pressed="${c===S.city}">${esc(c.replace("市","").replace("縣",""))}</button>`).join("");
   }
   function render(){
-    const inCity=S.rows.filter(c=>S.city==="全部"||c.city===S.city);
-    const counts={todo:0,go:0,later:0,no:0,all:inCity.length};
-    inCity.forEach(c=>counts[bucket(c)]++);
+    const base=S.rows.filter(c=>(S.city==="全部"||c.city===S.city)&&(S.type==="全部"||(S.type==="客戶異動"?isOwnerChange(c):!isOwnerChange(c))));
+    const counts={todo:0,go:0,later:0,no:0,all:base.length};
+    base.forEach(c=>counts[bucket(c)]++);
     for(const k in counts) $("#n-"+k).textContent=counts[k];
-    const rows=inCity.filter(c=>S.f==="all"||bucket(c)===S.f).sort((a,b)=>(b.firstSeen||"").localeCompare(a.firstSeen||""));
+    const rows=base.filter(c=>S.f==="all"||bucket(c)===S.f).sort((a,b)=>(b.firstSeen||"").localeCompare(a.firstSeen||""));
     if(!S.rows.length){$("#list").innerHTML='<div class="empty">目前沒有名單。確認右上角齒輪「連線設定」已填好 Apps Script 網址和密碼。</div>';return}
     if(!rows.length){$("#list").innerHTML='<div class="empty">這個分類目前沒有店家。</div>';return}
     $("#list").innerHTML=rows.map(c=>{
@@ -194,8 +200,9 @@ body{margin:0}
     if(e.target.id==="cfg-open"){openCfg();return}
     if(e.target.id==="cfg-close"||e.target.id==="cfg-backdrop"){closeCfg();return}
     if(e.target.id==="cfg-save"){LS.set("nps_url",$("#cfg-url").value.trim());LS.set("nps_token",$("#cfg-token").value.trim());API.url=$("#cfg-url").value.trim();API.token=$("#cfg-token").value.trim();closeCfg();load();return}
-    const t=e.target.closest("[data-f],[data-c],[data-act]"); if(!t) return;
+    const t=e.target.closest("[data-f],[data-c],[data-t],[data-act]"); if(!t) return;
     if(t.dataset.f){S.f=t.dataset.f;document.querySelectorAll(".tab").forEach(b=>b.setAttribute("aria-pressed",b===t));render();return}
+    if(t.dataset.t){S.type=t.dataset.t;document.querySelectorAll("#types .city").forEach(b=>b.setAttribute("aria-pressed",b===t));render();return}
     if(t.dataset.c){S.city=t.dataset.c;renderCities();render();return}
     const card=t.closest(".card"); if(!card) return; const id=card.dataset.id; const row=S.rows.find(r=>r.id===id);
     if(t.dataset.act==="dec"){const v=DEC_R[t.dataset.v];save(id,{decision:row.decision===v?"":v})}
