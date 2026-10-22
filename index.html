@@ -363,33 +363,42 @@ hr { border: none; border-top: 0.5px solid var(--border2); margin: 14px 0; }
     </div>
 
     <div id="temp-visit-form" style="display:none;padding:10px 12px;background:var(--bg2);border-radius:var(--radius-sm);border:0.5px solid var(--border);margin-bottom:10px">
-      <div style="font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.06em;margin-bottom:8px">新案店家資訊</div>
-      <input id="temp-name" placeholder="店名（必填）" style="margin-bottom:6px" />
-      <div class="loc-input-row" style="margin-bottom:6px">
-        <input id="temp-addr" placeholder="地址（可用下方定位自動填入，再核對門牌）" />
-        <button class="btn-sm" onclick="geocodeTempAddress()" id="temp-geo-btn">📍 定位填地址</button>
+      <div id="temp-visit-fields">
+        <div style="font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.06em;margin-bottom:8px">新案店家資訊</div>
+        <input id="temp-name" placeholder="店名（必填）" style="margin-bottom:6px" />
+        <div class="loc-input-row" style="margin-bottom:6px">
+          <input id="temp-addr" placeholder="地址（可用下方定位自動填入，再核對門牌）" />
+          <button class="btn-sm" onclick="geocodeTempAddress()" id="temp-geo-btn">📍 定位填地址</button>
+        </div>
+        <input id="temp-tel" placeholder="電話（選填）" style="margin-bottom:6px" />
+        <div style="display:flex;gap:6px;margin-bottom:6px">
+          <select id="temp-keyman-title" style="flex:1">
+            <option value="">職稱（選填）</option>
+            <option value="藥師">藥師</option>
+            <option value="老闆">老闆</option>
+            <option value="採購">採購</option>
+          </select>
+          <input id="temp-keyman-name" placeholder="稱呼" style="flex:1" />
+        </div>
+        <div id="temp-owner-row" style="margin-bottom:10px">
+          <select id="temp-owner">
+            <option value="我">負責人：我</option>
+            <option value="老爸">負責人：老爸</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:6px">
+          <button class="btn-action" onclick="startTempVisitLight()" style="flex:1;height:36px;font-size:13px">📝 只記這次拜訪</button>
+          <button class="btn-action" onclick="reviewTempVisit()" id="temp-submit-btn" style="flex:1;height:36px;font-size:13px;background:var(--text);color:var(--bg);border-color:var(--text)">📋 正式建檔</button>
+        </div>
+        <div style="font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:8px">只記這次拜訪：不會建立正式客戶，但店名/地址/電話/稱呼會存進「未建檔店家」清單，下次拜訪同一家店可以直接從清單點選，不用重新輸入，不確定會不會合作時用這個（負責人欄只在正式建檔才會用到）。正式建檔：下一步會先列出即將寫入的資料給你確認，確定要發展成客戶時用這個</div>
       </div>
-      <input id="temp-tel" placeholder="電話（選填）" style="margin-bottom:6px" />
-      <div style="display:flex;gap:6px;margin-bottom:6px">
-        <select id="temp-keyman-title" style="flex:1">
-          <option value="">職稱（選填）</option>
-          <option value="藥師">藥師</option>
-          <option value="老闆">老闆</option>
-          <option value="採購">採購</option>
-        </select>
-        <input id="temp-keyman-name" placeholder="稱呼" style="flex:1" />
+      <div id="temp-confirm-panel" style="display:none">
+        <div id="temp-confirm-body"></div>
+        <div style="display:flex;gap:8px;margin-top:10px;margin-bottom:6px">
+          <button class="btn-action" onclick="cancelReviewTempVisit()" style="flex:1;height:36px;font-size:13px">← 返回修改</button>
+          <button class="btn-action" onclick="confirmTempVisit()" id="temp-confirm-btn" style="flex:1;height:36px;font-size:13px;background:var(--text);color:var(--bg);border-color:var(--text)">✅ 確認送出</button>
+        </div>
       </div>
-      <div id="temp-owner-row" style="margin-bottom:10px">
-        <select id="temp-owner">
-          <option value="我">負責人：我</option>
-          <option value="老爸">負責人：老爸</option>
-        </select>
-      </div>
-      <div style="display:flex;gap:8px;margin-bottom:6px">
-        <button class="btn-action" onclick="startTempVisitLight()" style="flex:1;height:36px;font-size:13px">📝 只記這次拜訪</button>
-        <button class="btn-action" onclick="startTempVisit()" id="temp-submit-btn" style="flex:1;height:36px;font-size:13px;background:var(--text);color:var(--bg);border-color:var(--text)">📋 正式建檔</button>
-      </div>
-      <div style="font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:8px">只記這次拜訪：不會建立正式客戶，但店名/地址/電話/稱呼會存進「未建檔店家」清單，下次拜訪同一家店可以直接從清單點選，不用重新輸入，不確定會不會合作時用這個（負責人欄只在正式建檔才會用到）。正式建檔：寫進新客戶資料表、產生正式編號，確定要發展成客戶時用這個</div>
       <button class="btn-action" onclick="hideTempVisit()" style="height:32px;font-size:12px;width:100%">取消</button>
     </div>
 
@@ -780,6 +789,9 @@ function hideTempVisit() {
   document.getElementById('temp-keyman-title').value = '';
   document.getElementById('temp-keyman-name').value = '';
   document.getElementById('temp-owner').value = '我';
+  // 重設確認面板狀態，避免下次打開「新案開發」時卡在確認畫面
+  document.getElementById('temp-confirm-panel').style.display = 'none';
+  document.getElementById('temp-visit-fields').style.display = 'block';
 }
 
 // 用目前GPS位置反查地址（OpenStreetMap Nominatim，免費不需金鑰）
@@ -869,8 +881,50 @@ async function startTempVisitLight() {
   }
 }
 
-// 建立正式客戶檔案（寫入新客戶資料表_AppSheet，取得真正的 Customer_ID）
-async function startTempVisit() {
+// 正式建檔前先列出即將寫入的欄位給業務員看一次再確認，尤其是地址解析出的縣市/行政區——
+// GPS 反查地址只給門牌起點，業務員本來就要自己核對，這一步讓他在資料寫進正式客戶表「之前」看到解析結果，
+// 不是寫進去之後才發現解析錯誤或漏核對
+function reviewTempVisit() {
+  const name = document.getElementById('temp-name').value.trim();
+  if (!name) { showToast('請輸入店名'); return; }
+  const addr = document.getElementById('temp-addr').value.trim();
+  const tel = document.getElementById('temp-tel').value.trim();
+  const keyManTitle = document.getElementById('temp-keyman-title').value.trim();
+  const keyManName = document.getElementById('temp-keyman-name').value.trim();
+  const owner = document.getElementById('temp-owner').value;
+
+  // 跟後端 handleNewPharmacy_ 同一套正規表達式，前端先預覽解析結果
+  const m = addr.match(/^(.{2,3}[市縣])(.{2,3}[市區鄉鎮])/);
+  const county = m ? m[1] : '';
+  const district = m ? m[2] : '';
+  const addrWarn = (addr && !county)
+    ? '<div style="color:#d92d20;margin-top:6px">⚠️ 地址解析不出縣市／行政區，請確認地址格式（例：台北市內湖區…）無誤再送出，否則縣市/行政區/郵遞區號會空白</div>'
+    : '';
+
+  document.getElementById('temp-confirm-body').innerHTML = `
+    <div style="font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.06em;margin-bottom:8px">確認以下資料後才會寫入正式客戶資料表</div>
+    <div style="font-size:13px;line-height:1.9">
+      <div>店名：${escapeHtml(name)}</div>
+      <div>地址：${escapeHtml(addr) || '（空白）'}</div>
+      <div>縣市／行政區：${county ? escapeHtml(county + district) : '（無法解析）'}</div>
+      <div>電話：${escapeHtml(tel) || '（空白）'}</div>
+      <div>職稱／稱呼：${escapeHtml(keyManTitle) || '（空白）'}　${escapeHtml(keyManName) || '（空白）'}</div>
+      <div>負責人：${escapeHtml(owner)}</div>
+    </div>
+    ${addrWarn}
+  `;
+
+  document.getElementById('temp-visit-fields').style.display = 'none';
+  document.getElementById('temp-confirm-panel').style.display = 'block';
+}
+
+function cancelReviewTempVisit() {
+  document.getElementById('temp-confirm-panel').style.display = 'none';
+  document.getElementById('temp-visit-fields').style.display = 'block';
+}
+
+// 業務員在確認畫面按下「確認送出」才真正呼叫後端寫入（寫入新客戶資料表_AppSheet，取得真正的 Customer_ID）
+async function confirmTempVisit() {
   const name = document.getElementById('temp-name').value.trim();
   if (!name) { showToast('請輸入店名'); return; }
   const addrInput = document.getElementById('temp-addr');
@@ -882,7 +936,7 @@ async function startTempVisit() {
   const lat = parseFloat(addrInput.dataset.lat) || userLat || 0;
   const lng = parseFloat(addrInput.dataset.lng) || userLng || 0;
 
-  const btn = document.getElementById('temp-submit-btn');
+  const btn = document.getElementById('temp-confirm-btn');
   btn.disabled = true; btn.textContent = '建檔中...';
 
   try {
@@ -917,7 +971,7 @@ async function startTempVisit() {
   } catch (e) {
     showToast('⚠️ 建檔失敗：' + e.message);
   } finally {
-    btn.disabled = false; btn.textContent = '建檔並開始記錄';
+    btn.disabled = false; btn.textContent = '✅ 確認送出';
   }
 }
 
