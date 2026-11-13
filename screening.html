@@ -99,6 +99,7 @@ body{margin:0}
       <button class="tab" data-f="later" aria-pressed="false">再查<b id="n-later">0</b></button>
       <button class="tab" data-f="no" aria-pressed="false">不去<b id="n-no">0</b></button>
       <button class="tab" data-f="all" aria-pressed="false">全部<b id="n-all">0</b></button>
+      <button class="tab" data-f="done" aria-pressed="false" title="已轉正式或已放棄，平常不顯示">結案<b id="n-done">0</b></button>
     </div>
     <div class="cities" id="types" role="group" aria-label="類型">
       <button class="city" data-t="全部" aria-pressed="true">全部類型</button>
@@ -136,7 +137,10 @@ body{margin:0}
   const gsearch=q=>"https://www.google.com/search?q="+encodeURIComponent(q);
   const mapAddr=a=>{let s=String(a||"").replace(/(區|鄉|鎮|市)([^區鄉鎮市路街道巷]{1,4}里)(?=\S*[路街道])/,"$1");const i=s.indexOf("號");return i>0?s.slice(0,i+1):s};
   const split=(s,sep)=>s?String(s).split(sep).filter(Boolean):[];
-  const bucket=r=>DEC[r.decision]||"todo";
+  // 轉正式／放棄是終點階段：移到「結案」分頁，其他分頁（含全部）都不再顯示。試算表的列不刪，A10 新店開發仍讀得到
+  const DONE_STAGES=["轉正式","放棄"];
+  const isDone=r=>DONE_STAGES.includes(String(r.stage||"").trim());
+  const bucket=r=>isDone(r)?"done":(DEC[r.decision]||"todo");
 
   function renderCities(){
     const list=["全部",...new Set(S.rows.map(c=>c.city))];
@@ -144,16 +148,17 @@ body{margin:0}
   }
   function render(){
     const base=S.rows.filter(c=>(S.city==="全部"||c.city===S.city)&&(S.type==="全部"||(S.type==="客戶異動"?isOwnerChange(c):!isOwnerChange(c))));
-    const counts={todo:0,go:0,later:0,no:0,all:base.length};
-    base.forEach(c=>counts[bucket(c)]++);
+    const counts={todo:0,go:0,later:0,no:0,done:0,all:0};
+    base.forEach(c=>{const b=bucket(c);counts[b]++;if(b!=="done")counts.all++});
     for(const k in counts) $("#n-"+k).textContent=counts[k];
-    const rows=base.filter(c=>S.f==="all"||bucket(c)===S.f).sort((a,b)=>(b.firstSeen||"").localeCompare(a.firstSeen||""));
+    const rows=base.filter(c=>S.f==="all"?bucket(c)!=="done":bucket(c)===S.f).sort((a,b)=>(b.firstSeen||"").localeCompare(a.firstSeen||""));
     if(!S.rows.length){$("#list").innerHTML='<div class="empty">目前沒有名單。確認右上角齒輪「連線設定」已填好 Apps Script 網址和密碼。</div>';return}
     if(!rows.length){$("#list").innerHTML='<div class="empty">這個分類目前沒有店家。</div>';return}
     $("#list").innerHTML=rows.map(c=>{
       const d=bucket(c), flags=split(c.flags,"；"), sch=split(c.scheduled,"、");
       return `<article class="card" data-id="${esc(c.id)}" data-d="${d}">
         <div class="top"><h2 class="name">${esc(c.name)}</h2><span class="dist">${esc(c.city.replace("市","").replace("縣",""))}${esc(c.district)}</span><span class="seen">首次出現 ${md(c.firstSeen)}</span></div>
+        ${d==="done"?`<div class="flags"><span class="flag">${esc(c.stage)}${c.stageDate?" "+esc(md(String(c.stageDate).slice(0,10))):""}${c.dropReason?"："+esc(c.dropReason):""}</span></div>`:""}
         <div class="addr"><span>${esc(c.address)}</span><button class="mini" data-act="copy">複製</button></div>
         <div class="meta">設立 <span class="m">${esc(c.setup)}</span> · 統編 <span class="m">${esc(c.taxIds)}</span> · ${esc(c.sources)}</div>
         ${sch.length?`<div class="flags">${sch.map(s=>`<span class="dist">已排 ${esc(md(s))}</span>`).join("")}</div>`:""}
@@ -164,11 +169,11 @@ body{margin:0}
           <label class="chk"><input type="checkbox" data-act="chain" ${c.chain?"checked":""}>連鎖藥局</label>
           <label class="chk"><input type="checkbox" data-act="wrong" ${c.wrong?"checked":""}>名單有誤／查無此店</label>
         </div>
-        <div class="decide" role="group" aria-label="決定">
+        ${d==="done"?"":`<div class="decide" role="group" aria-label="決定">
           <button data-act="dec" data-v="go" aria-pressed="${d==="go"}">要去</button>
           <button data-act="dec" data-v="later" aria-pressed="${d==="later"}">再查</button>
           <button data-act="dec" data-v="no" aria-pressed="${d==="no"}">不去</button>
-        </div>
+        </div>`}
         <input class="note" data-act="note" placeholder="備註（例如：對面是耳鼻喉科、老藥師）" value="${esc(c.note||"")}">
       </article>`}).join("");
   }
