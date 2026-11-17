@@ -125,7 +125,7 @@ body{margin:0}
 (function(){
   // ===== 連線設定（存在這台裝置的瀏覽器）=====
   const LS={get(k){try{return localStorage.getItem(k)||""}catch(e){return ""}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
-  const DEFAULT_URL="https://script.google.com/macros/s/AKfycbyUJrKP1PsAOsQx8sVnJE5dwMhsn7LdEdZctsP_Y_T8em7AM5BtubDDpR1eL-1ZLxUNuQ/exec"; // 部署後可直接把 /exec 網址填在這裡，就不用每台裝置輸入
+  const DEFAULT_URL=""; // 2026-11-17 輪替：這是公開頁面，不再把 /exec 網址寫死在這裡，一律由每台裝置自己在齒輪設定填（舊版這裡原本有預設網址方便不用每台輸入，但這個檔案在 GitHub Pages 上公開，等於把網址外流，故移除）
   const API={url:LS.get("nps_url")||DEFAULT_URL,token:LS.get("nps_token")};
   const S={rows:[],f:"todo",city:"全部",type:"全部"};
   const DEC={"要去":"go","再查":"later","不去":"no"}, DEC_R={go:"要去",later:"再查",no:"不去"};
